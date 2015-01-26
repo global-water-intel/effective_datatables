@@ -19,7 +19,7 @@ module Effective
 
     def order(collection)
       if order_column.present?
-        collection.order("#{order_column[:column]} #{order_direction} NULLS #{order_direction == 'ASC' ? 'LAST' : 'FIRST'}")
+        collection.order("#{order_column[:column]} #{order_direction}")
       else
         collection
       end
@@ -42,7 +42,7 @@ module Effective
         if table_column[:filter][:type] == :select && table_column[:filter][:fuzzy] != true
           collection.where("#{column} = :term", :term => term)
         else
-          collection.where("#{column} ILIKE :term", :term => "%#{term}%")
+          collection.where("#{column} LIKE LOWER(:term)", :term => "%#{term}%")
         end
       when :datetime
         begin
