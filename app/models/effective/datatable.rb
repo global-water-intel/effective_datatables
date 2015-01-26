@@ -309,7 +309,7 @@ module Effective
         cols[name][:array_index] = index # The index of this column in the collection, regardless of hidden table_columns
         cols[name][:name] ||= name
         cols[name][:label] ||= name.titleize
-        cols[name][:column] ||= (sql_table && sql_column) ? "\"#{sql_table.name}\".\"#{sql_column.name}\"" : name
+        cols[name][:column] ||= (sql_table && sql_column) ? "`#{sql_table.name}`.`#{sql_column.name}`" : name
         cols[name][:type] ||= (belong_tos.key?(name) ? :belongs_to : sql_column.try(:type)).presence || :string
         cols[name][:width] ||= nil
         cols[name][:sortable] = true if cols[name][:sortable] == nil
