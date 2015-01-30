@@ -6,7 +6,7 @@ initializeDataTables = ->
       init_options =
         bServerSide: true
         bProcessing: true
-        bSaveState: true
+        stateSave: true
         bAutoWidth: false
         deferRender: true
         order: datatable.data('default-order')
