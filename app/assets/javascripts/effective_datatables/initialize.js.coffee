@@ -4,10 +4,10 @@ initializeDataTables = ->
       datatable = $(this)
 
       init_options =
-        serverSide: true
-        processing: true
+        bServerSide: true
+        bProcessing: true
         stateSave: true
-        autoWidth: false
+        bAutoWidth: false
         deferRender: true
         order: datatable.data('default-order')
         sAjaxSource: datatable.data('source')
