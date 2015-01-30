@@ -63,6 +63,6 @@ $ -> initializeDataTables()
 $(document).on 'page:change', -> initializeDataTables()
 resetTable = (event) ->
   $('table[data-effective-datatables-table]').DataTable().state.clear()
-  window.location.reload()
+  window.location = window.location.pathname
 
 $(document).on 'click', '[data-effective-datatables-reset-filters]', resetTable
