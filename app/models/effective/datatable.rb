@@ -89,13 +89,13 @@ module Effective
           unless total_records.kind_of?(Hash)
             total_records.to_i
           else
-            (total_records.keys.map(&:first).uniq.count rescue 1)
+            (total_records.keys.map(&:first).uniq.count)
           end),
         :iTotalDisplayRecords => (
           unless display_records.kind_of?(Hash)
             display_records.to_i
           else
-            (display_records.keys.map(&:first).uniq.count rescue 1)
+            (display_records.keys.map(&:first).uniq.count)
           end)
       }
     end
@@ -164,13 +164,13 @@ module Effective
       col = collection
 
       if active_record_collection?
-        self.total_records = (col.select('*').reorder(nil).count rescue 1)
+        self.total_records = (col.reorder(nil).count rescue 1)
 
         col = table_tool.order(col)
         col = table_tool.search(col)
 
         if table_tool.search_terms.present? && array_tool.search_terms.blank?
-          self.display_records = (col.select('*').reorder(nil).count rescue 1)
+          self.display_records = (col.reorder(nil).count rescue 1)
         end
       else
         self.total_records = col.size
