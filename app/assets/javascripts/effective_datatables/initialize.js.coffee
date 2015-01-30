@@ -4,13 +4,13 @@ initializeDataTables = ->
       datatable = $(this)
 
       init_options =
-        bServerSide: true
-        bProcessing: true
+        serverSide: true
+        processing: true
         stateSave: true
-        bAutoWidth: false
+        autoWidth: false
         deferRender: true
         order: datatable.data('default-order')
-        sAjaxSource: datatable.data('source')
+        ajax: datatable.data('source')
         pagingType: 'simple_numbers'
         lengthMenu: [[10, 25, 50, 100, 250, 1000, -1], [10, 25, 50, 100, 250, 1000, 'All']]
         fnServerParams: (aoData, a, b) ->
@@ -61,5 +61,8 @@ initializeDataTables = ->
 
 $ -> initializeDataTables()
 $(document).on 'page:change', -> initializeDataTables()
-
-$(document).on 'click', '[data-effective-datatables-reset-filters]', (event) -> window.location.reload()
+resetTable = (event) -> 
+  $('table[data-effective-datatables-table]').DataTable().state.clear()
+  window.location.reload()
+  
+$(document).on 'click', '[data-effective-datatables-reset-filters]', resetTable
