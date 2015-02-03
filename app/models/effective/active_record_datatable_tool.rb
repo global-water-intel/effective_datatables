@@ -74,6 +74,14 @@ module Effective
         collection.where("#{column} = :term", :term => term.to_i)
       when :year
         collection.where("EXTRACT(YEAR FROM #{column}) = :term", :term => term.to_i)
+      when :boolean
+        if term == 'true'
+          collection.where("#{column} = ?", true)
+        elsif term == 'false'
+          collection.where("#{column} = ?", false)
+        else
+          collection
+        end
       else
         collection.where("#{column} = :term", :term => term)
       end
