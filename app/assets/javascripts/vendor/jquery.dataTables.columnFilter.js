@@ -116,8 +116,8 @@
                 search_init = '';
             }
 
-
-            var input = $('<input type="text" class="' + search_init + sCSSClass + '" placeholder="' + inputvalue.replace(/"/g, '&quot;') + '" value="' + inputvalue + '" rel="' + i + '"/>');
+            var escapedValue = inputvalue.replace(/"/g, '&quot;');
+            var input = $('<input type="text" class="' + search_init + sCSSClass + '" placeholder="' + escapedValue + '" value="' + escapedValue + '" rel="' + i + '"/>');
             if (iMaxLenght != undefined && iMaxLenght != -1) {
                 input.attr('maxlength', iMaxLenght);
             }
