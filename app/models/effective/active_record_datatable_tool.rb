@@ -40,9 +40,9 @@ module Effective
       case table_column[:type]
       when :string, :text
         if table_column[:filter][:type] == :select && table_column[:filter][:fuzzy] != true
-          collection.where("#{column} = :term", :term => term)
+          collection.where("LOWER(#{column}) = LOWER(:term)", :term => term)
         else
-          collection.where("#{column} LIKE LOWER(:term)", :term => "%#{term}%")
+          collection.where("LOWER(#{column}) LIKE LOWER(:term)", :term => "%#{term}%")
         end
       when :datetime
         begin
