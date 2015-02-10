@@ -117,7 +117,7 @@
             }
 
 
-            var input = $('<input type="text" class="' + search_init + sCSSClass + '" placeholder="' + inputvalue + '" value="' + inputvalue + '" rel="' + i + '"/>');
+            var input = $('<input type="text" class="' + search_init + sCSSClass + '" placeholder="' + inputvalue.replace(/"/g, '&quot;') + '" value="' + inputvalue + '" rel="' + i + '"/>');
             if (iMaxLenght != undefined && iMaxLenght != -1) {
                 input.attr('maxlength', iMaxLenght);
             }
