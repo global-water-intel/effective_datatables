@@ -42,7 +42,7 @@ module Effective
         if table_column[:filter][:type] == :select && table_column[:filter][:fuzzy] != true
           collection.where("LOWER(#{column}) = LOWER(:term)", :term => term)
         else
-          collection.where("LOWER(#{column}) LIKE LOWER(:term)", :term => "%#{term}%")
+          build_conditions_for(term, column, collection)
         end
       when :datetime
         begin
@@ -89,6 +89,18 @@ module Effective
 
     def paginate(collection)
       collection.page(page).per(per_page)
+    end
+    
+    def build_conditions_for(terms, column, collection)
+      if terms.match(/\".*\"/)
+        splits = [terms.gsub('"', "%")]
+      else
+        splits = terms.split.map { |w| "%#{w}%" }
+      end
+
+      splits.reduce(collection) do |col, word|
+        col.where("LOWER(#{column}) LIKE LOWER(:term)", term: word)
+      end
     end
 
   end
