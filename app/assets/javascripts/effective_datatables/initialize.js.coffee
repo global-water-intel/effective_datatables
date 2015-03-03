@@ -30,7 +30,7 @@ initializeDataTables = ->
           ]
         aoColumns: datatable.data('widths')
         oTableTools:
-          sSwfPath: '/assets/effective_datatables/copy_csv_xls_pdf.swf',
+          sSwfPath: 'assets/effective_datatables/copy_csv_xls_pdf.swf',
           aButtons: ['copy', 'csv', 'pdf', 'print']
         colVis:
           showAll: 'Show all'
