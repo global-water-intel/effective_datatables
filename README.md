@@ -99,13 +99,9 @@ Here we just render the datatable:
 
 ```erb
 <h1>All Posts</h1>
-
-<% if @datatable.collection.length == 0 %>
-  <p>There are no posts.</p>
-<% else %>
-  <%= render_datatable(@datatable) %>
-<% end %>
+<%= render_datatable(@datatable) %>
 ```
+
 
 ## How It Works
 
@@ -133,12 +129,11 @@ module Effective
   module Datatables
     class Posts < Effective::Datatable
       default_order :created_at, :desc
+      default_entries 25
 
       table_column :id, :visible => false
 
-      table_column :created_at, :width => '25%' do |post|
-        post.created_at.strftime("%Y-%m-%d %H:%M:%S")
-      end
+      table_column :created_at, :width => '25%'
 
       table_column :updated_at, :proc => Proc.new { |post| nicetime(post.updated_at) } # just a standard helper as defined in helpers/application_helper.rb
 
@@ -156,7 +151,7 @@ module Effective
         end
       end
 
-      table_column :title, :label => 'Post Title'
+      table_column :title, :label => 'Post Title', :class => 'col-title'
       table_column :actions, :sortable => false, :filter => false, :partial => '/posts/actions'
 
       def collection
@@ -184,11 +179,25 @@ or (complex example):
 
 ```ruby
 def collection
-  User.unscoped.uniq
-    .joins('LEFT JOIN customers ON customers.user_id = users.id')
-    .select('users.*')
-    .select('customers.stripe_customer_id AS stripe_customer_id')
-    .includes(:addresses)
+  collection = Effective::Order.unscoped.purchased
+    .joins(:user)
+    .joins(:order_items)
+    .group('users.email')
+    .group('orders.id')
+    .select('users.email AS email')
+    .select('orders.*')
+    .select("#{query_total} AS total")
+    .select("string_agg(order_items.title, '!!OI!!') AS order_items")
+
+  if attributes[:user_id].present?
+    collection.where(:user_id => attributes[:user_id])
+  else
+    collection
+  end
+end
+
+def query_total
+  "SUM((order_items.price * order_items.quantity) + (CASE order_items.tax_exempt WHEN true THEN 0 ELSE ((order_items.price * order_items.quantity) * order_items.tax_rate) END))"
 end
 ```
 
@@ -251,6 +260,7 @@ The following options control the display behaviour of the column:
 :sortable => true|false   # Allow sorting of this column.  Otherwise the up/down arrows on the frontend will be disabled.
 :visible => true|false    # Hide this column at startup.  Column visbility can be changed on the frontend.  By default, hidden column filter terms are ignored.
 :width => '100%'|'100px'  # Set the width of this column.  Can be set on one, all or some of the columns.  If using percentages, should never add upto more than 100%
+:class => 'col-example'   # Adds an html class to the column's TH and all TD elements.  Add more than one class with 'example col-example something'
 ```
 
 ### Filtering Options
@@ -374,9 +384,83 @@ Sort the table by this field and direction on start up
 default_order :created_at, :asc|:desc
 ```
 
+## default_entries
+
+The number of entries to show per page
+
+```ruby
+default_entries :all
+```
+
+Valid options are `10, 25, 50, 100, 250, 1000, :all`
+
+
 ## Additional Functionality
 
 There are a few other ways to customize the behaviour of effective_datatables
+
+### Display of an Empty Datatable
+
+How an empty datatable (0 display records) is displayed depends on how `render_datatable` is called.
+
+To render the full datatable with the default 'No data available in table' message:
+
+```haml
+= render_datatable(@datatable)
+```
+
+To skip rendering the datatable and just output a custom message:
+
+```haml
+= render_datatable(@datatable, 'There are no posts.')
+```
+
+or
+
+```haml
+= render_datatable(@datatable, :empty => 'There are no posts.')
+```
+
+To skip rendering the datatable and instead render given content:
+
+```haml
+= render_datatable(@datatable) do
+  %p There are no posts.
+  %p
+    Have a picture of a cat instead
+    = image_tag('cat.png')
+```
+
+### Checking for Empty collection
+
+While the 'what to render when empty' situation is handled by the above syntax, you may still check whether the datatable has records to display by calling `@datatable.empty?` and `@datatable.present?`.
+
+The gotcha with these methods is that the `@datatable.view` must first be assigned (which is done automatically by the `render_datatable` view method).
+
+This implementation is a bit awkward but has significant performance tradeoffs.
+
+To check for an empty datatable collection before it's rendered, you must manually assign a view:
+
+```ruby
+class PostsController < ApplicationController
+  def index
+    @datatable = Effective::Datatables::Posts.new()
+    @datatable.view = view_context  # built in Rails controller method refering to the view
+    @datatable.empty?
+  end
+end
+```
+
+or
+
+```ruby
+class PostsController < ApplicationController
+  def index
+    @datatable = Effective::Datatables::Posts.new()
+    @datatable.empty?(view_context)
+  end
+end
+```
 
 ### Customize Filter Behaviour
 
@@ -441,6 +525,53 @@ and remove the table_column when a user_id is present:
 ```ruby
 table_column :user_id, :if => Proc.new { attributes[:user_id].blank? } do |post|
   post.user.email
+end
+```
+
+### Helper methods
+
+Any non-private methods defined in the datatable model will be available to your table_columns and evaluated in the view_context.
+
+```ruby
+module Effective
+  module Datatables
+    class Posts < Effective::Datatable
+      table_column :title do |post|
+        format_post_title(post)
+      end
+
+      def collection
+        Post.all
+      end
+
+      def format_post_title(post)
+        if post.title.start_with?('important')
+          link_to(post.title.upcase, post_path(post))
+        else
+          link_to(post.title, post_path(post))
+        end
+      end
+
+    end
+  end
+end
+```
+
+You can also get the same functionality by including a regular Rails helper within the datatable model.
+
+```ruby
+module PostHelper
+end
+```
+
+```ruby
+module Effective
+  module Datatables
+    class Posts < Effective::Datatable
+      include PostsHelper
+
+    end
+  end
 end
 ```
 

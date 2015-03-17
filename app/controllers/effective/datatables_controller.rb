@@ -4,9 +4,9 @@ module Effective
 
     def show
       @datatable = Effective::Datatable.find(params[:id], params[:attributes])
-      @datatable.view = view_context if @datatable.present?
+      @datatable.view = view_context if !@datatable.nil?
 
-      EffectiveDatatables.authorized?(self, :index, @datatable.collection_class)
+      EffectiveDatatables.authorized?(self, :index, @datatable.try(:collection_class) || Effective::Datatable)
 
       respond_to do |format|
         format.html

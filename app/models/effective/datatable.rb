@@ -40,6 +40,10 @@ module Effective
       def default_order(name, direction = :asc)
         @default_order = {name => direction}
       end
+
+      def default_entries(entries)
+        @default_entries = entries
+      end
     end
 
     def initialize(*args)
@@ -81,8 +85,10 @@ module Effective
       end.each_with_index { |(_, col), index| col[:index] = index }
     end
 
-    def to_json(options = {})
-      {
+    def to_json
+      raise 'Effective::Datatable to_json called with a nil view.  Please call render_datatable(@datatable) or @datatable.view = view before this method' unless view.present?
+
+      @json ||= {
         :sEcho => params[:sEcho].to_i,
         :aaData => table_data || [],
         :iTotalRecords => (
@@ -103,22 +109,51 @@ module Effective
     # Wish these were protected
 
     def order_column_index
-      params[:iSortCol_0].to_i
+      if params[:iSortCol_0].present?
+        params[:iSortCol_0].to_i
+      elsif default_order.present?
+        (table_columns[default_order.keys.first.to_s] || {}).fetch(:index, 0)
+      else
+        0
+      end
     end
 
     def order_direction
-      params[:sSortDir_0].try(:downcase) == 'desc' ? 'DESC' : 'ASC'
+      if params[:sSortDir_0].present?
+        params[:sSortDir_0].try(:downcase) == 'desc' ? 'DESC' : 'ASC'
+      elsif default_order.present?
+        default_order.values.first.to_s.downcase == 'desc' ? 'DESC' : 'ASC'
+      else
+        'ASC'
+      end
     end
 
     def default_order
       self.class.instance_variable_get(:@default_order)
     end
 
+    def default_entries
+      @default_entries ||= begin
+        entries = (self.class.instance_variable_get(:@default_entries).presence || EffectiveDatatables.default_entries)
+        entries = -1 if entries.to_s.downcase == 'all'
+        [10, 25, 50, 100, 250, 1000, -1].include?(entries) ? entries : 25
+      end
+    end
+
     def search_terms
       @search_terms ||= HashWithIndifferentAccess.new().tap do |terms|
-        table_columns.keys.each_with_index do |col, x|
-          unless (params["sVisible_#{x}"] == 'false' && table_columns[col][:filter][:when_hidden] != true)
-            terms[col] = params["sSearch_#{x}"] if params["sSearch_#{x}"].present?
+        if params[:sEcho].present?
+          table_columns.keys.each_with_index do |col, x|
+            unless (params["sVisible_#{x}"] == 'false' && table_columns[col][:filter][:when_hidden] != true)
+              terms[col] = params["sSearch_#{x}"] if params["sSearch_#{x}"].present?
+            end
+          end
+        else
+          # We are in the initial render and have to apply default search terms only
+          table_columns.each do |name, values|
+            if (values[:filter][:selected].present?) && (values[:visible] != false || values[:filter][:when_hidden] == true)
+              terms[name] = values[:filter][:selected]
+            end
           end
         end
       end
@@ -134,14 +169,14 @@ module Effective
     end
 
     def per_page
-      length = params[:iDisplayLength].to_i
+      length = (params[:iDisplayLength].presence || default_entries).to_i
 
       if length == -1
         9999999
       elsif length > 0
         length
       else
-        10
+        25
       end
     end
 
@@ -152,8 +187,23 @@ module Effective
     def view=(view_context)
       @view = view_context
       @view.formats = [:html]
+
+      # 'Just work' with attributes
       @view.class.send(:attr_accessor, :attributes)
       @view.attributes = self.attributes
+
+      # "Copy & Paste" any additional methods defined on the datatable into the view_context
+      begin
+        methods_for_view = ''
+
+        (self.class.instance_methods(false) - [:collection, :search_column]).each do |instance_method|
+          methods_for_view << self.class.instance_method(instance_method).source
+        end
+
+        @view.class.module_eval(methods_for_view)
+      rescue => e
+      end
+
     end
 
     protected
@@ -164,13 +214,13 @@ module Effective
       col = collection
 
       if active_record_collection?
-        self.total_records = (col.reorder(nil).count rescue 1)
+        self.total_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_total_count").first['count'] rescue 1)
 
         col = table_tool.order(col)
         col = table_tool.search(col)
 
         if table_tool.search_terms.present? && array_tool.search_terms.blank?
-          self.display_records = (col.reorder(nil).count rescue 1)
+          self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first['count'] rescue 1)
         end
       else
         self.total_records = col.size
@@ -228,6 +278,8 @@ module Effective
             view.instance_exec(obj, collection, self, &opts[:proc])
           elsif opts[:type] == :belongs_to
             val = (obj.send(name) rescue nil).to_s
+          elsif opts[:type] == :obfuscated_id
+            (obj.send(:to_param) rescue nil).to_s
           else
             val = (obj.send(name) rescue nil)
             val = (obj[opts[:array_index]] rescue nil) if val == nil
@@ -237,11 +289,11 @@ module Effective
           # Last minute formatting of dates
           case value
           when Date
-            value.strftime("%Y-%m-%d")
+            value.strftime(EffectiveDatatables.date_format)
           when Time
-            value.strftime("%Y-%m-%d %H:%M:%S")
+            value.strftime(EffectiveDatatables.datetime_format)
           when DateTime
-            value.strftime("%Y-%m-%d %H:%M:%S")
+            value.strftime(EffectiveDatatables.datetime_format)
           else
             value
           end
@@ -310,9 +362,17 @@ module Effective
         cols[name][:name] ||= name
         cols[name][:label] ||= name.titleize
         cols[name][:column] ||= (sql_table && sql_column) ? "`#{sql_table.name}`.`#{sql_column.name}`" : name
-        cols[name][:type] ||= (belong_tos.key?(name) ? :belongs_to : sql_column.try(:type)).presence || :string
+
         cols[name][:width] ||= nil
         cols[name][:sortable] = true if cols[name][:sortable] == nil
+        cols[name][:type] ||= (belong_tos.key?(name) ? :belongs_to : (sql_column.try(:type).presence || :string))
+        cols[name][:class] = "col-#{cols[name][:type]} col-#{name} #{cols[name][:class]}".strip
+
+        if name == 'id' && collection.respond_to?(:deobfuscate)
+          cols[name][:sortable] = false
+          cols[name][:type] = :obfuscated_id
+        end
+
         cols[name][:filter] = initialize_table_column_filter(cols[name][:filter], cols[name][:type], belong_tos[name])
 
         if cols[name][:partial]

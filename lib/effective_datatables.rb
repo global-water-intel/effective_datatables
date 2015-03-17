@@ -6,6 +6,9 @@ require "effective_datatables/version"
 
 module EffectiveDatatables
   mattr_accessor :authorization_method
+  mattr_accessor :date_format
+  mattr_accessor :datetime_format
+  mattr_accessor :default_entries
 
   def self.setup
     yield self

@@ -1,10 +1,23 @@
 module EffectiveDatatablesHelper
-  def render_datatable(datatable, opts = {})
+  def render_datatable(datatable, opts = {}, &block)
     datatable.view = self
-    locals = {:style => :full, :filterable => true, :sortable => true, :table_class => 'table-bordered table-striped'}.merge(opts)
+
+    locals = {:style => :full, :filterable => true, :sortable => true, :table_class => 'table-bordered table-striped'}
+    locals = locals.merge(opts) if opts.kind_of?(Hash)
     locals[:table_class] = 'sorting-hidden ' + locals[:table_class].to_s if locals[:sortable] == false
 
-    render :partial => 'effective/datatables/datatable', :locals => locals.merge(:datatable => datatable)
+    # Do we have to look at empty? behaviour
+    if (block_given? || opts.kind_of?(String) || (opts.kind_of?(Hash) && opts[:empty].present?)) && datatable.empty?
+      if block_given?
+        yield; nil
+      elsif opts.kind_of?(String)
+        opts
+      elsif opts.kind_of?(Hash) && opts[:empty].present?
+        opts[:empty]
+      end
+    else
+      render :partial => 'effective/datatables/datatable', :locals => locals.merge(:datatable => datatable)
+    end
   end
 
   def render_simple_datatable(datatable, opts = {})
@@ -62,8 +75,19 @@ module EffectiveDatatablesHelper
     datatable.table_columns.values.map { |options| {'sWidth' => options[:width]} if options[:width] }.to_json()
   end
 
+  def datatable_column_classes(datatable)
+    [].tap do |classes|
+      datatable.table_columns.values.each_with_index do |options, x|
+        classes << {:className => options[:class], :targets => [x]} if options[:class].present?
+      end
+    end.to_json()
+  end
+
   def datatables_admin_path?
-    (attributes[:admin_path] || request.referer.downcase.include?('/admin/')) rescue false
+    @datatables_admin_path ||= (
+      referer = request.referer.to_s.downcase.chomp('/') + '/'
+      (attributes[:admin_path] || referer.include?('/admin/')) rescue false
+    )
   end
 
   # TODO: Improve on this
