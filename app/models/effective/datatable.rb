@@ -106,6 +106,16 @@ module Effective
       }
     end
 
+    def present?(view = nil)
+      self.view = view unless view.nil?
+      to_json[:iTotalDisplayRecords] > 0
+    end
+
+    def empty?(view = nil)
+      self.view = view unless view.nil?
+      to_json[:iTotalDisplayRecords] == 0
+    end
+
     # Wish these were protected
 
     def order_column_index
