@@ -94,7 +94,7 @@ module Effective
     end
 
     def paginate(collection)
-      collection.page(page).per_page_kaminari(per_page)
+      collection.per_page_kaminari(page).per(per_page)
     end
 
     def build_conditions_for(terms, column, collection)
