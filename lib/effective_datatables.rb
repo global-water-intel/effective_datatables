@@ -1,5 +1,8 @@
 require 'jquery-datatables-rails'
 require 'kaminari'
+Kaminari.configure do |config|
+  config.page_method_name = :per_page_kaminari
+end
 
 require "effective_datatables/engine"
 require "effective_datatables/version"
