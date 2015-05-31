@@ -3,39 +3,37 @@ initializeDataTables = ->
     unless $.fn.DataTable.fnIsDataTable(this)
       datatable = $(this)
 
+      aoColumnDefs = [
+        { bSortable: false, aTargets: datatable.data('non-sortable') },
+        { bVisible: false, aTargets: datatable.data('non-visible') }
+      ].concat(datatable.data('column-classes') || [])
+
       init_options =
         bServerSide: true
         bProcessing: true
         stateSave: true
         bAutoWidth: false
+        # deferLoading: [datatable.data('display-records'), datatable.data('total-records')]
         deferRender: true
         order: datatable.data('default-order')
         sAjaxSource: datatable.data('source')
         pagingType: 'simple_numbers'
         lengthMenu: [[10, 25, 50, 100, 250, 1000, -1], [10, 25, 50, 100, 250, 1000, 'All']]
+        iDisplayLength: datatable.data('default-entries')
         fnServerParams: (aoData, a, b) ->
           table = this.DataTable()
-          table.columns().flatten().each (index) ->
+          table.columns().flatten().each (index) ->  # Pass which columns are visible back to server
             aoData.push({'name': "sVisible_#{index}", 'value': table.column(index).visible()})
-        aoColumnDefs:
-          [
-            {
-             bSortable: false,
-             aTargets: datatable.data('non-sortable')
-            },
-            {
-             bVisible: false,
-             aTargets: datatable.data('non-visible')
-            }
-          ]
+
+        aoColumnDefs: aoColumnDefs
         aoColumns: datatable.data('widths')
         oTableTools:
-          sSwfPath: '/assets/effective_datatables/copy_csv_xls_pdf.swf',
-          aButtons: ['copy', 'csv', 'pdf', 'print']
+          sSwfPath: "<%= asset_path('effective_datatables/copy_csv_xls_pdf.swf') %>",
+          aButtons: ['csv', {'sExtends': 'xls', 'sButtonText': 'Excel'}, 'print']
         colVis:
           showAll: 'Show all'
-          restore: 'Restore default visible'
-          activate: 'mouseover'
+          restore: 'Show default'
+          activate: 'click'
           fnStateChange: (iCol, bVisible) ->
             table = $(this.dom.button).closest('.dataTables_wrapper').children('table').first().DataTable()
             table.draw()
@@ -56,11 +54,15 @@ initializeDataTables = ->
           aoColumns : datatable.data('filter')
           bUseColVis: true
 
+        $.each (datatable.data('filter') || []), (index, filter) ->
+          if(filter.selected)
+            datatable.fnSettings().aoPreSearchCols[index].sSearch = filter.selected
   $('.dataTables_filter').each ->
     $(this).html("<button class='btn-reset-filters ColVis_Button' data-effective-datatables-reset-filters='true'><span>Reset Filters</span></button>")
 
 $ -> initializeDataTables()
 $(document).on 'page:change', -> initializeDataTables()
+
 resetTable = (event) ->
   $('table[data-effective-datatables-table]').DataTable().state.clear()
   window.location = window.location.pathname

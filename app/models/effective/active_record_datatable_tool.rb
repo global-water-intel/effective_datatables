@@ -18,10 +18,12 @@ module Effective
     end
 
     def order(collection)
-      if order_column.present?
-        collection.order("#{order_column[:column]} #{order_direction}")
+      return collection if order_column.blank?
+
+      if [:string, :text].include?(order_column[:type])
+        collection.order("COALESCE(#{order_column[:column]}, '') #{order_direction}")
       else
-        collection
+        collection.order("#{order_column[:column]} #{order_direction}")
       end
     end
 

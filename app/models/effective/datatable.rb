@@ -89,35 +89,22 @@ module Effective
       raise 'Effective::Datatable to_json called with a nil view.  Please call render_datatable(@datatable) or @datatable.view = view before this method' unless view.present?
 
       @json ||= {
-        :sEcho => params[:sEcho].to_i,
-        :aaData => table_data || [],
-        :iTotalRecords => (
-          unless total_records.kind_of?(Hash)
-            total_records.to_i
-          else
-            (total_records.keys.map(&:first).uniq.count)
-          end),
-        :iTotalDisplayRecords => (
-          unless display_records.kind_of?(Hash)
-            display_records.to_i
-          else
-            (display_records.keys.map(&:first).uniq.count)
-          end)
+        :sEcho => (params[:sEcho] || 0),
+        :aaData => (table_data || []),
+        :iTotalRecords => (total_records || 0),
+        :iTotalDisplayRecords => (display_records || 0)
       }
     end
 
-    def present?(view = nil)
-      self.view = view unless view.nil?
-      to_json[:iTotalDisplayRecords] > 0
+    def present?
+      total_records.to_i > 0
     end
 
-    def empty?(view = nil)
-      self.view = view unless view.nil?
-      to_json[:iTotalDisplayRecords] == 0
+    def empty?
+      total_records.to_i == 0
     end
 
     # Wish these were protected
-
     def order_column_index
       if params[:iSortCol_0].present?
         params[:iSortCol_0].to_i
@@ -194,6 +181,16 @@ module Effective
       params[:iDisplayStart].to_i / per_page + 1
     end
 
+    def total_records
+      @total_records ||= (
+        if active_record_collection?
+          (collection_class.connection.execute("SELECT COUNT(*) FROM (#{collection.to_sql}) AS datatables_total_count").first.first).to_i
+        else
+          collection.size
+        end
+      )
+    end
+
     def view=(view_context)
       @view = view_context
       @view.formats = [:html]
@@ -202,18 +199,13 @@ module Effective
       @view.class.send(:attr_accessor, :attributes)
       @view.attributes = self.attributes
 
-      # "Copy & Paste" any additional methods defined on the datatable into the view_context
-      begin
-        methods_for_view = ''
+      # Delegate any methods defined on the datatable directly to our view
+      @view.class.send(:attr_accessor, :effective_datatable)
+      @view.effective_datatable = self
 
-        (self.class.instance_methods(false) - [:collection, :search_column]).each do |instance_method|
-          methods_for_view << self.class.instance_method(instance_method).source
-        end
-
-        @view.class.module_eval(methods_for_view)
-      rescue => e
+      (self.class.instance_methods(false) - [:collection, :search_column]).each do |view_method|
+        @view.class_eval { delegate view_method, :to => :@effective_datatable }
       end
-
     end
 
     protected
@@ -224,16 +216,12 @@ module Effective
       col = collection
 
       if active_record_collection?
-        self.total_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_total_count").first.first)
-
         col = table_tool.order(col)
         col = table_tool.search(col)
 
         if table_tool.search_terms.present? && array_tool.search_terms.blank?
-          self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first.first)
+          self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first.first).to_i
         end
-      else
-        self.total_records = col.size
       end
 
       if array_tool.search_terms.present?
@@ -401,6 +389,9 @@ module Effective
       elsif filter.kind_of?(Hash) == false
         filter = {}
       end
+
+      # This is a fix for passing filter[:selected] == false, it needs to be 'false'
+      filter[:selected] = filter[:selected].to_s unless filter[:selected].nil?
 
       case col_type # null, number, select, number-range, date-range, checkbox, text(default)
       when :belongs_to
