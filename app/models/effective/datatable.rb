@@ -224,13 +224,13 @@ module Effective
       col = collection
 
       if active_record_collection?
-        self.total_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_total_count").first['count'] rescue 1)
+        self.total_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_total_count").first.first)
 
         col = table_tool.order(col)
         col = table_tool.search(col)
 
         if table_tool.search_terms.present? && array_tool.search_terms.blank?
-          self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first['count'] rescue 1)
+          self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first.first)
         end
       else
         self.total_records = col.size
