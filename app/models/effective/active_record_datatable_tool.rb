@@ -20,11 +20,13 @@ module Effective
     def order(collection)
       return collection if order_column.blank?
 
-      if [:string, :text].include?(order_column[:type])
-        collection.order("COALESCE(#{order_column[:column]}, '') #{order_direction}")
-      else
-        collection.order("#{order_column[:column]} #{order_direction}")
-      end
+      # if [:string, :text].include?(order_column[:type])
+      #   collection.order("COALESCE(#{order_column[:column]}, '') #{order_direction}")
+      # else
+      #   collection.order("#{order_column[:column]} #{order_direction}")
+      # end
+
+      collection.order("#{order_column[:column]} #{order_direction}")
     end
 
     def search(collection)

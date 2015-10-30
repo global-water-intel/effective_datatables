@@ -184,7 +184,11 @@ module Effective
     def total_records
       @total_records ||= (
         if active_record_collection?
-          (collection_class.connection.execute("SELECT COUNT(*) FROM (#{collection.to_sql}) AS datatables_total_count").first.first).to_i
+          begin
+            collection.uniq.count
+          rescue ActiveRecord::StatementInvalid
+            (collection_class.connection.execute("SELECT COUNT(*) FROM (#{collection.to_sql}) AS datatables_total_count").first.first).to_i
+          end
         else
           collection.size
         end
@@ -220,7 +224,11 @@ module Effective
         col = table_tool.search(col)
 
         if table_tool.search_terms.present? && array_tool.search_terms.blank?
-          self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first.first).to_i
+          begin
+            col.uniq.count
+          rescue ActiveRecord::StatementInvalid
+            self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first.first).to_i
+          end
         end
       end
 
