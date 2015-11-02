@@ -225,7 +225,7 @@ module Effective
 
         if table_tool.search_terms.present? && array_tool.search_terms.blank?
           begin
-            col.uniq.count
+            self.display_records = col.uniq.count
           rescue ActiveRecord::StatementInvalid
             self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first.first).to_i
           end
