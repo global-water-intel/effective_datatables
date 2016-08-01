@@ -1,4 +1,4 @@
-//= require vendor/jquery.debounce.min
+//= require vendor/jquery.delayedChange
 //= require vendor/jszip.min
 
 //= require dataTables/jquery.dataTables.min
@@ -18,6 +18,7 @@
 //= require effective_datatables/bulk_actions
 //= require effective_datatables/responsive
 //= require effective_datatables/scopes
+//= require effective_datatables/charts
 //= require effective_datatables/initialize
 
 $.extend( $.fn.dataTable.defaults, {

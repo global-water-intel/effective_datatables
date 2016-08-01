@@ -4,12 +4,16 @@ module Effective
   module EffectiveDatatable
     module Options
 
-      def initialize_options
-        @table_columns = initialize_column_options(@table_columns)
+      def initialize_datatable_options
+        @table_columns = _initialize_datatable_options(@table_columns)
       end
 
-      def initialize_scopes
-        @scopes = initialize_scope_options(@scopes)
+      def initialize_scope_options
+        @scopes = _initialize_scope_options(@scopes)
+      end
+
+      def initialize_chart_options
+        @charts = _initialize_chart_options(@charts)
       end
 
       def quote_sql(name)
@@ -25,26 +29,27 @@ module Effective
 
       # A scope comes to us like {:start_date => {default: Time.zone.now, filter: {as: :select, collection: ... input_html :}}}
       # We want to make sure an input_html: { value: default } exists
-      def initialize_scope_options(scopes)
+      def _initialize_scope_options(scopes)
         (scopes || []).each do |name, options|
           value = attributes.key?(name) ? attributes[name] : options[:default]
+
+          if (options[:fallback] || options[:presence]) && attributes[name].blank? && attributes[name] != false
+            self.attributes[name] = options[:default]
+            value = options[:default]
+          end
 
           options[:filter] ||= {}
           options[:filter][:input_html] ||= {}
           options[:filter][:input_html][:value] = value
           options[:filter][:selected] = value
-
-          if attributes.key?(name) == false
-            self.attributes[name] = options[:default]
-          end
-
-          if (options[:fallback] || options[:presence]) && attributes[name].blank? && attributes[name] != false
-            self.attributes[name] = options[:default]
-          end
         end
       end
 
-      def initialize_column_options(cols)
+      def _initialize_chart_options(charts)
+        charts
+      end
+
+      def _initialize_datatable_options(cols)
         sql_table = (collection.table rescue nil)
 
         # Here we identify all belongs_to associations and build up a Hash like:
@@ -113,6 +118,8 @@ module Effective
               :effective_address
             elsif sql_column.try(:type).present?
               sql_column.type
+            elsif name.end_with?('_id')
+              :integer
             else
               :string # When in doubt
             end
@@ -121,7 +128,7 @@ module Effective
           cols[name][:class] = "col-#{cols[name][:type]} col-#{name} #{cols[name][:class]}".strip
 
           # Formats
-          if name == 'id' || name.include?('year') || name.include?('_id')
+          if name == 'id' || name.include?('year') || name.end_with?('_id')
             cols[name][:format] = :non_formatted_integer
           end
 

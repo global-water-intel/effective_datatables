@@ -69,15 +69,18 @@ initializeDataTables = ->
       pagingType: 'simple_numbers'
       initComplete: (settings) ->
         initializeBulkActions(this.api())
-        initializeScopes(this.api())
         initializeFilters(this.api())
       drawCallback: (settings) ->
         $table = $(this.api().table().node())
         selected = $table.data('bulk-actions-restore-selected-values')
         completeBulkAction($table, selected) if selected && selected.length > 0
 
-        if settings['json'] && settings['json']['aggregates']
-          drawAggregates($table, settings['json']['aggregates'])
+        if settings['json']
+          if settings['json']['aggregates']
+            drawAggregates($table, settings['json']['aggregates'])
+
+          if settings['json']['charts']
+            drawCharts($table, settings['json']['charts'])
 
     # Copies the bulk actions html, stored in a data attribute on the table, into the buttons area
     initializeBulkActions = (api) ->
@@ -107,12 +110,11 @@ initializeDataTables = ->
         if $row
           $.each values, (col, value) => $row.children().eq(col).html(value)
 
-    # Appends the scope html
-    initializeScopes = (api) ->
-      $table = $(api.table().node())
-      scopes = $table.data('scopes')
-
-      $table.closest('.dataTables_wrapper').prepend(scopes['scopeHtml']) if scopes
+    drawCharts = ($table, charts) ->
+      $.each charts, (name, data) =>
+        $(".effective-datatables-chart[data-name='#{name}']").each (_, obj) =>
+          chart = new google.visualization[data['type']](obj)
+          chart.draw(google.visualization.arrayToDataTable(data['data']), data['options'])
 
     # Appends the filter html, stored in the column definitions, into each column header
     initializeFilters = (api) ->
@@ -138,15 +140,14 @@ initializeDataTables = ->
         $input.parent().on 'mousedown', (event) -> event.stopPropagation() # Dont order columns when you click inside the input
 
         if $input.is('select')
-          $input.on 'change', (event) -> dataTableSearch(event)
+          $input.on 'change', (event) -> dataTableSearch($(event.currentTarget))
         else if $input.is('input')
-          $input.keyup($.debounce(300, dataTableSearch))
+          $input.delayedChange ($input) -> dataTableSearch($input)
 
     # Do the actual search
-    dataTableSearch = (event) ->   # This is the function called by a select or input to run the search
-      obj = $(event.currentTarget)
-      table = obj.closest('table.dataTable')
-      table.DataTable().column("#{obj.data('column-name')}:name").search(obj.val()).draw()
+    dataTableSearch = ($input) ->   # This is the function called by a select or input to run the search
+      table = $input.closest('table.dataTable')
+      table.DataTable().column("#{$input.data('column-name')}:name").search($input.val()).draw()
 
     if simple
       init_options['dom'] = "<'row'<'col-sm-12'tr>>" # Just show the table

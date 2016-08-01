@@ -7,10 +7,14 @@ module Effective
 
     delegate :render, :controller, :link_to, :mail_to, :number_to_currency, :number_to_percentage, :to => :@view
 
-    include Effective::EffectiveDatatable::Dsl
-    extend Effective::EffectiveDatatable::Dsl::ClassMethods
+    extend Effective::EffectiveDatatable::Dsl
+    include Effective::EffectiveDatatable::Dsl::BulkActions
+    include Effective::EffectiveDatatable::Dsl::Charts
+    include Effective::EffectiveDatatable::Dsl::Datatable
+    include Effective::EffectiveDatatable::Dsl::Scopes
 
     include Effective::EffectiveDatatable::Ajax
+    include Effective::EffectiveDatatable::Charts
     include Effective::EffectiveDatatable::Helpers
     include Effective::EffectiveDatatable::Hooks
     include Effective::EffectiveDatatable::Options
@@ -22,9 +26,20 @@ module Effective
         args.first.each { |k, v| self.attributes[k] = v }
       end
 
-      initialize_datatable  # This creates @table_columns based on the DSL datatable do .. end block
-      initialize_scopes     # This normalizes scopes, and copies scope default values to attributes
-      initialize_options    # This normalizes all the options
+      if respond_to?(:initialize_scopes)  # There was at least one scope defined in the scopes do .. end block
+        initialize_scopes
+        initialize_scope_options
+      end
+
+      if respond_to?(:initialize_datatable)
+        initialize_datatable          # This creates @table_columns based on the DSL datatable do .. end block
+        initialize_datatable_options  # This normalizes all the options
+      end
+
+      if respond_to?(:initialize_charts)
+        initialize_charts
+        initialize_chart_options
+      end
 
       unless active_record_collection? || array_collection?
         raise "Unsupported collection type. Should be ActiveRecord class, ActiveRecord relation, or an Array of Arrays [[1, 'something'], [2, 'something else']]"
@@ -41,6 +56,10 @@ module Effective
 
     def scopes
       @scopes
+    end
+
+    def charts
+      @charts
     end
 
     def aggregates
@@ -86,7 +105,8 @@ module Effective
           :data => (data || []),
           :recordsTotal => (total_records || 0),
           :recordsFiltered => (display_records || 0),
-          :aggregates => (aggregate_data(data) || [])
+          :aggregates => (aggregate_data(data) || []),
+          :charts => (charts_data || {})
         }
       end
     end
@@ -102,7 +122,6 @@ module Effective
     def total_records
       @total_records ||= (
         if active_record_collection?
-          # https://github.com/rails/rails/issues/15331
           if collection_class.connection.respond_to?(:unprepared_statement)
             collection_sql = collection_class.connection.unprepared_statement { collection.to_sql }
             (collection_class.connection.execute("SELECT COUNT(*) FROM (#{collection_sql}) AS datatables_total_count").first.to_a.map(&:second).first).to_i
@@ -127,18 +146,26 @@ module Effective
       @view.class.send(:attr_accessor, :effective_datatable)
       @view.effective_datatable = self
 
-      (self.class.instance_methods(false) - [:collection, :search_column, :order_column]).each do |view_method|
-        @view.class_eval { delegate view_method, :to => :@effective_datatable }
+      unless @view.respond_to?(:bulk_action)
+        @view.class.send(:include, Effective::EffectiveDatatable::Dsl::BulkActions)
       end
 
       Effective::EffectiveDatatable::Helpers.instance_methods(false).each do |helper_method|
-        @view.class_eval { delegate helper_method, :to => :@effective_datatable }
+        @view.class_eval { delegate helper_method, to: :@effective_datatable }
+      end
+
+      (self.class.instance_methods(false) - [:collection, :search_column, :order_column]).each do |view_method|
+        @view.class_eval { delegate view_method, to: :@effective_datatable }
       end
 
       # Clear the search_terms memoization
       @search_terms = nil
       @order_name = nil
       @order_direction = nil
+    end
+
+    def view_context
+      view
     end
 
     def table_html_class
