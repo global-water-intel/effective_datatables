@@ -25,6 +25,11 @@ module Effective
               self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first.values.first rescue 1).to_i
             end
           end
+        elsif elasticsearch_collection?
+          col = elasticsearch_tool.order(col)
+          col = elasticsearch_tool.search(col)
+
+          self.display_records = elasticsearch_tool.total_entries(col)
         end
 
         if array_tool.search_terms.present?
@@ -71,7 +76,7 @@ module Effective
 
             locals.merge!(opts[:partial_locals]) if opts[:partial_locals]
 
-            if active_record_collection?
+            if active_record_collection? || elasticsearch_collection?
               if locals[:show_action] == :authorize
                 locals[:show_action] = (EffectiveDatatables.authorized?(controller, :show, collection_class) rescue false)
               end

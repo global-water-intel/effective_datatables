@@ -41,8 +41,8 @@ module Effective
         initialize_chart_options
       end
 
-      unless active_record_collection? || array_collection?
-        raise "Unsupported collection type. Should be ActiveRecord class, ActiveRecord relation, or an Array of Arrays [[1, 'something'], [2, 'something else']]"
+      unless active_record_collection? || array_collection? || elasticsearch_collection?
+        raise "Unsupported collection type. Should be ActiveRecord class, ActiveRecord relation, or an Array of Arrays [[1, 'something'], [2, 'something else']], or an Elasticsearch::Response"
       end
 
       if @default_order.present? && !table_columns.key?((@default_order.keys.first rescue nil))
@@ -128,6 +128,8 @@ module Effective
           else
             (collection_class.connection.execute("SELECT COUNT(*) FROM (#{collection.to_sql}) AS datatables_total_count").first.to_a.map(&:second).first).to_i
           end
+        elsif elasticsearch_collection?
+          elasticsearch_tool.total_entries(collection)
         else
           collection.size
         end
@@ -193,8 +195,16 @@ module Effective
       @array_tool ||= ArrayDatatableTool.new(self, table_columns.select { |_, col| col[:array_column] })
     end
 
+    def elasticsearch_tool
+      @elasticsearch_tool ||= ElasticsearchDatatableTool.new(self, table_columns.reject { |_, col| col[:array_column] })
+    end
+
     def active_record_collection?
       collection.ancestors.include?(ActiveRecord::Base) rescue false
+    end
+
+    def elasticsearch_collection?
+      collection.class == EsQueryBuilder rescue false
     end
 
     def array_collection?
