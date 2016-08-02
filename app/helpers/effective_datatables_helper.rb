@@ -58,7 +58,7 @@ module EffectiveDatatablesHelper
     form = nil
     simple_form_for(:datatable_filter, url: '#', html: {id: "#{datatable.to_param}-form"}) { |f| form = f }
 
-    datatable.table_columns.map do |name, options|
+    datatable.display_or_default_table_columns.map do |name, options|
       {
         name: options[:name],
         title: content_tag(:span, options[:label], class: 'filter-label'),

@@ -16,6 +16,10 @@ module Effective
         end
       end
 
+      def display_or_default_table_columns
+        display_table_columns.presence || table_columns
+      end
+
       def order_name
         @order_name ||= begin
           if params[:order] && params[:columns]

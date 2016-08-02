@@ -1,3 +1,8 @@
+resetFilters = ->
+  window.location.pathname = window.location.pathname + '/reset_filters'
+resetAll = ->
+  window.location.pathname = window.location.pathname + '/reset_all'
+
 initializeDataTables = ->
   $('table.effective-datatable').each ->
     return if $.fn.DataTable.fnIsDataTable(this)
@@ -13,6 +18,14 @@ initializeDataTables = ->
       ajax: { url: datatable.data('source'), type: 'POST' }
       autoWidth: false
       buttons: [
+        {
+          text: 'Reset Filters',
+          action: resetFilters
+        },
+        {
+          text: 'Reset Everything',
+          action: resetAll
+        },
         {
           extend: 'colvis',
           text: 'Show / hide columns',
@@ -50,6 +63,7 @@ initializeDataTables = ->
             columns: ':visible:not(.col-actions)'
         },
       ]
+      # colReorder: false
       colReorder: !simple
       columns: datatable.data('columns')
       deferLoading: [datatable.data('display-records'), datatable.data('total-records')]
@@ -64,6 +78,7 @@ initializeDataTables = ->
         table = this.api()
         table.columns().flatten().each (index) =>
           params['columns'][index]['visible'] = table.column(index).visible()
+          # params['columns'][index]['search']['value'] = table.column(index).search()
       serverSide: true
       scrollCollapse: true
       pagingType: 'simple_numbers'
@@ -127,6 +142,7 @@ initializeDataTables = ->
 
         if settings.filterHtml  # Append the html filter HTML and initialize input events
           $th.append('<br>' + settings.filterHtml)
+          api.column(index).search($th.find('input,select').val())
           initializeFilterEvents($th)
 
     # Sets up the proper events for each input

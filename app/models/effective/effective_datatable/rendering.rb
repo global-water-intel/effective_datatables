@@ -203,7 +203,8 @@ module Effective
                 row[index] = 'No'
               end
             when :string
-              row[index] = mail_to(value) if name == 'email'
+              # TODO: makes it impossible to copy the email address. disable for now
+              # row[index] = mail_to(value) if name == 'email'
             else
               ; # Nothing
             end

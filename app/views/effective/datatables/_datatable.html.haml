@@ -19,7 +19,7 @@
 %table.effective-datatable{effective_datatable_params}
   %thead
     %tr
-      - datatable.table_columns.each do |name, opts|
+      - datatable.display_or_default_table_columns.each do |name, opts|
         %th= opts[:label] || name
 
   %tbody
