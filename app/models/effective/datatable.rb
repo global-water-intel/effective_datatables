@@ -129,7 +129,7 @@ module Effective
             (collection_class.connection.execute("SELECT COUNT(*) FROM (#{collection.to_sql}) AS datatables_total_count").first.to_a.map(&:second).first).to_i
           end
         elsif elasticsearch_collection?
-          elasticsearch_tool.total_entries(collection)
+          elasticsearch_tool.unfiltered_total_entries(collection)
         else
           collection.size
         end
