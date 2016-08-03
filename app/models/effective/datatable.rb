@@ -204,7 +204,7 @@ module Effective
     end
 
     def elasticsearch_collection?
-      collection.class == EsQueryBuilder rescue false
+      collection.class == ElasticsearchQueryBuilder rescue false
     end
 
     def array_collection?
