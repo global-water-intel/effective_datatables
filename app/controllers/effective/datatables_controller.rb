@@ -15,6 +15,9 @@ module Effective
       respond_to do |format|
         format.html
         format.json {
+          if defined?(current_user) && current_user.respond_to?(:datatable_options)
+            current_user.datatable_options = params if attributes[:save_state]
+          end
           if Rails.env.production?
             render :json => (@datatable.to_json rescue error_json)
           else
