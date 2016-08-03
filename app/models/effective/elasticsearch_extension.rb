@@ -36,10 +36,14 @@ module Effective
             when :string, :text
               indexes name, analyzer: :case_insensitive
             when :integer
-              indexes name, index: :not_analyzed, type: :integer
-              indexes name_for_searching, index: :not_analyzed, type: :string
+              if klass.defined_enums.keys.include?(name)
+                indexes name, index: :not_analyzed, type: :string
+              else
+                indexes name, index: :not_analyzed, type: :integer
+                indexes name_for_searching, index: :not_analyzed, type: :string
 
-              indexes name.gsub('_id', ''), analyzer: :case_insensitive if klass.belongs_to_column?(column.name)
+                indexes name.gsub('_id', ''), analyzer: :case_insensitive if klass.belongs_to_column?(column.name)
+              end
             when :datetime
               indexes name, index: :not_analyzed, type: :date, format: :date
               indexes name_for_searching, index: :not_analyzed, type: :string
@@ -50,6 +54,8 @@ module Effective
               indexes name, index: :not_analyzed, type: :boolean
             when :spatial
               # TODO: figure out what we do with spatial columns. Ignoring at the moment.
+            when :uuid
+              indexes name, index: :not_analyzed, type: :string
             else
               binding.pry
             end
@@ -112,12 +118,16 @@ module Effective
 
           h[name] = check.is_a?(String) ? check : check.to_s
         when :integer
-          h[name] = send name
-          h[name_for_searching] = h[name].to_s
+          if klass.defined_enums.keys.include?(name)
+            h[name] = send(name)
+          else
+            h[name] = send name
+            h[name_for_searching] = h[name].to_s
 
-          if klass.belongs_to_column?(column.name)
-            assoc = column.name.gsub('_id', '')
-            h[assoc] = send(assoc).try(:to_s)
+            if klass.belongs_to_column?(column.name)
+              assoc = column.name.gsub('_id', '')
+              h[assoc] = send(assoc).try(:to_s)
+            end
           end
         when :datetime
           # TODO: be sure this is formatted such that we can search/sort with it
@@ -130,6 +140,8 @@ module Effective
           h[name] = send(name)
         when :spatial
           # TODO: figure out what we do with spatial columns. Ignoring at the moment.
+        when :uuid
+          h[name] = send(name).to_s
         else
           binding.pry
         end

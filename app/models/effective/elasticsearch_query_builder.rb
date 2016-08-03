@@ -105,6 +105,7 @@ module Effective
 
     def execute_unfiltered_count!
       opts = { size: 0 }
+      # binding.pry
       active_record_klass.__elasticsearch__.search(opts).total_entries
     end
   end
