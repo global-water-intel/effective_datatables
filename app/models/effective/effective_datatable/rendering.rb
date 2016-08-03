@@ -59,6 +59,7 @@ module Effective
       def arrayize(collection)
         return collection if @arrayized  # Prevent the collection from being arrayized more than once
         @arrayized = true
+        collection = collection.to_a
 
         # We want to use the render :collection for each column that renders partials
         rendered = {}
