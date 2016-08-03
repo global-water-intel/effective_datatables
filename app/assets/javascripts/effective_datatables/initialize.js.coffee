@@ -78,7 +78,6 @@ initializeDataTables = ->
         table = this.api()
         table.columns().flatten().each (index) =>
           params['columns'][index]['visible'] = table.column(index).visible()
-          # params['columns'][index]['search']['value'] = table.column(index).search()
       serverSide: true
       scrollCollapse: true
       pagingType: 'simple_numbers'
@@ -142,7 +141,8 @@ initializeDataTables = ->
 
         if settings.filterHtml  # Append the html filter HTML and initialize input events
           $th.append('<br>' + settings.filterHtml)
-          api.column(index).search($th.find('input,select').val())
+          if !$th.hasClass('col-bulk_actions_column')
+            api.column(index).search($th.find('input,select').val())
           initializeFilterEvents($th)
 
     # Sets up the proper events for each input
