@@ -17,7 +17,7 @@ module Effective
       end
 
       def display_or_default_table_columns
-        display_table_columns.presence || table_columns
+        (display_table_columns.presence || table_columns).select { |_, v| v.present? }
       end
 
       def order_name

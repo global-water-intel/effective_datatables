@@ -64,7 +64,7 @@ module Effective
 
         # We want to use the render :collection for each column that renders partials
         rendered = {}
-        (display_table_columns || table_columns).each do |name, opts|
+        display_or_default_table_columns.each do |name, opts|
           if opts[:partial] && opts[:visible]
             locals = HashWithIndifferentAccess.new(
               datatable: self,
@@ -110,7 +110,7 @@ module Effective
         end
 
         collection.each_with_index.map do |obj, index|
-          (display_table_columns || table_columns).map do |name, opts|
+          display_or_default_table_columns.map do |name, opts|
             begin
               if opts[:visible] == false
                 BLANK
@@ -152,7 +152,7 @@ module Effective
 
       def format(collection)
         collection.each do |row|
-          (display_table_columns || table_columns).each_with_index do |(name, opts), index|
+          display_or_default_table_columns.each_with_index do |(name, opts), index|
             value = row[index]
             next if value == nil || value == BLANK || opts[:visible] == false
             next if opts[:block] || opts[:partial] || opts[:proc]
@@ -223,7 +223,7 @@ module Effective
         values = table_data.transpose
 
         aggregates.map do |name, options|
-          (display_table_columns || table_columns).map.with_index do |(name, column), index|
+          display_or_default_table_columns.map.with_index do |(name, column), index|
 
             if column[:visible] != true
               ''

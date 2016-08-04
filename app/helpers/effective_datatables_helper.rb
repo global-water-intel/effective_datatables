@@ -58,7 +58,9 @@ module EffectiveDatatablesHelper
     form = nil
     simple_form_for(:datatable_filter, url: '#', html: {id: "#{datatable.to_param}-form"}) { |f| form = f }
 
-    datatable.display_or_default_table_columns.map do |name, options|
+    datatable
+      .display_or_default_table_columns
+      .map do |name, options|
       {
         name: options[:name],
         title: content_tag(:span, options[:label], class: 'filter-label'),
@@ -70,7 +72,7 @@ module EffectiveDatatablesHelper
         filterHtml: (datatable_header_filter(form, name, datatable.search_terms[name], options) unless datatable.simple?),
         filterSelectedValue: options[:filter][:selected]
       }
-    end.to_json()
+    end.to_json
   end
 
   def datatable_bulk_actions(datatable)
