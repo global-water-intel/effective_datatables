@@ -70,11 +70,17 @@ module Effective
               indexes "#{name}_id", index: :not_analyzed, type: :integer
             end
           end
+
+          instance_exec(&klass.elasticsearch_index_hook)
         end
       end
     end
 
     module ClassMethods
+      def elasticsearch_index_hook
+        -> {}
+      end
+
       def public_attributes_for_elasticsearch
         public_attributes
       end
@@ -100,6 +106,10 @@ module Effective
       def es_import
         __elasticsearch__.import force: true, scope: :for_elasticsearch
       end
+    end
+
+    def as_indexed_json_hook(default_json)
+      default_json
     end
 
     def as_indexed_json(_options = {})
@@ -156,6 +166,8 @@ module Effective
           h["#{name}_id"] = send(name).try(:id)
         end
       end
+
+      as_indexed_json_hook(h)
 
       h
     end
