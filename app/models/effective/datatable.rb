@@ -187,6 +187,14 @@ module Effective
       @simple == true
     end
 
+    def reset_filter_buttons?
+      save_state?
+    end
+
+    def save_state?
+      attributes[:save_state] == true || attributes['save_state'] == 'true'
+    end
+
     def charts?
       charts_partial.present?
     end

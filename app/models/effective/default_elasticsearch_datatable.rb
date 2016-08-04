@@ -3,9 +3,9 @@ module Effective
     attr_writer :select_overrides
     DEFAULT_VISIBLE_COLUMN_LIMIT = 7
 
-    # scopes do
-    #   scope :created_at, (Time.zone.now - 3.months).to_date.to_formatted_s(:db), filter: { input_html: { class: 'datepicker' } }
-    # end
+    scopes do
+      define_scopes.call
+    end
 
     datatable do
       table_column :id, type: :integer
@@ -43,8 +43,10 @@ module Effective
       table_column :updated_at, visible: false, type: :datetime
 
       actions_column destroy: false
-      bulk_actions_column do
-        # bulk_action 'Test', test_path, data: { method: :post, resource_method: :id }
+      if save_state?
+        bulk_actions_column do
+          # bulk_action 'Test', test_path, data: { method: :post, resource_method: :id }
+        end
       end
     end
 
@@ -64,7 +66,6 @@ module Effective
       return @elasticsearch_collection if defined?(@elasticsearch_collection)
 
       base = record_class.es_query
-      base.dt_query({ 'name' => 'created_at', 'type' => :datetime }, attributes[:created_at]) if attributes[:created_at].present?
 
       belongs_to_associations.each do |assoc|
         foreign_key = assoc.foreign_key.to_s
@@ -77,6 +78,8 @@ module Effective
       end
 
       register_elasticsearch_aggregates(base)
+
+      query_scopes(base)
 
       @elasticsearch_collection = base
     end
@@ -107,6 +110,14 @@ module Effective
       aggregate_definitions.each do |_, v|
         col.add_aggregate(*v)
       end
+    end
+
+    def query_scopes(col)
+      col
+    end
+
+    def define_scopes
+      -> {}
     end
 
     def search_column(collection, table_column, search_term, sql_column_or_array_index)

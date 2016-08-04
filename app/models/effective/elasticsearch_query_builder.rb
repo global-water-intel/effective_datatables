@@ -44,7 +44,7 @@ module Effective
       when :string, :text
         query wildcard: { name => "*#{term.downcase}*" }
         # query match: { name => term }
-      when :foreign_key
+      when :foreign_key, :exact_string
         filter term: { name => term }
       when :datetime
         query wildcard: { name_for_searching => "*#{term}*" }

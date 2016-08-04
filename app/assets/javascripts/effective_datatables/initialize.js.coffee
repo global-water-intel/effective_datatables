@@ -9,15 +9,48 @@ initializeDataTables = ->
 
     datatable = $(this)
     simple = (datatable.data('simple') == true)
-    input_js_options = datatable.data('input-js-options') || {}
+    resetFilterButtons = (datatable.data('reset-filter-buttons') == true)
+    baseButtons = [
+      {
+        extend: 'colvis',
+        text: 'Show / hide columns',
+        postfixButtons: [
+          { extend: 'colvisGroup', text: 'Show all', show: ':hidden'},
+          { extend: 'colvisRestore', text: 'Show default'}
+        ]
+      },
+      {
+        extend: 'copy',
+        exportOptions:
+          format:
+            header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
+          columns: ':not(.col-actions)'
+      },
+      {
+        extend: 'csv',
+        exportOptions:
+          format:
+            header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
+          columns: ':not(.col-actions)'
+      },
+      {
+        extend: 'excel',
+        exportOptions:
+          format:
+            header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
+          columns: ':not(.col-actions)'
+      },
+      {
+        extend: 'print',
+        exportOptions:
+          format:
+            header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
+          columns: ':visible:not(.col-actions)'
+      },
+    ]
 
-    if input_js_options['buttons'] == false
-      input_js_options['buttons'] = []
-
-    init_options =
-      ajax: { url: datatable.data('source'), type: 'POST' }
-      autoWidth: false
-      buttons: [
+    if resetFilterButtons
+      extraButtons = [
         {
           text: 'Reset Filters',
           action: resetFilters
@@ -26,43 +59,18 @@ initializeDataTables = ->
           text: 'Reset Everything',
           action: resetAll
         },
-        {
-          extend: 'colvis',
-          text: 'Show / hide columns',
-          postfixButtons: [
-            { extend: 'colvisGroup', text: 'Show all', show: ':hidden'},
-            { extend: 'colvisRestore', text: 'Show default'}
-          ]
-        },
-        {
-          extend: 'copy',
-          exportOptions:
-            format:
-              header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
-            columns: ':not(.col-actions)'
-        },
-        {
-          extend: 'csv',
-          exportOptions:
-            format:
-              header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
-            columns: ':not(.col-actions)'
-        },
-        {
-          extend: 'excel',
-          exportOptions:
-            format:
-              header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
-            columns: ':not(.col-actions)'
-        },
-        {
-          extend: 'print',
-          exportOptions:
-            format:
-              header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
-            columns: ':visible:not(.col-actions)'
-        },
       ]
+    else
+      extraButtons = []
+    input_js_options = datatable.data('input-js-options') || {}
+
+    if input_js_options['buttons'] == false
+      input_js_options['buttons'] = []
+
+    init_options =
+      ajax: { url: datatable.data('source'), type: 'POST' }
+      autoWidth: false
+      buttons: extraButtons.concat(baseButtons)
       colReorder: false
       # colReorder: !simple
       columns: datatable.data('columns')

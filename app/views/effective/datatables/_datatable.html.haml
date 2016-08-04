@@ -8,6 +8,7 @@
       'columns' => datatable_columns(datatable),
       'input-js-options' => local_assigns[:input_js_options],
       'simple' => datatable.simple?.to_s,
+      'reset-filter-buttons' => datatable.reset_filter_buttons?.to_s,
       'source' => effective_datatables.datatable_path(datatable, {format: 'json'}.merge(attributes: datatable.attributes)).chomp('?'),
       'default-order' => datatable_default_order(datatable),
       'display-entries' => datatable.display_entries,
