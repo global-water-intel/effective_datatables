@@ -1,5 +1,6 @@
 module Effective
   class DefaultElasticsearchDatatable < Effective::Datatable
+    delegate :aggregate_for, to: :searched_collection
     attr_writer :select_overrides
     DEFAULT_VISIBLE_COLUMN_LIMIT = 7
 
@@ -61,6 +62,8 @@ module Effective
     end
 
     def collection
+      # return @elasticsearch_collection if defined?(@elasticsearch_collection)
+
       base = record_class.es_query
       base.dt_query({ 'name' => 'created_at', 'type' => :datetime }, attributes[:created_at]) if attributes[:created_at].present?
 
@@ -74,7 +77,9 @@ module Effective
         base = base.dt_query opts, a_id
       end
 
-      base
+      register_elasticsearch_aggregates(base)
+
+      @elasticsearch_collection = base
     end
 
     def type_for_attribute(col)
@@ -87,6 +92,9 @@ module Effective
 
     def serialized_columns
       []
+    end
+
+    def register_elasticsearch_aggregates(_collection)
     end
 
     def search_column(collection, table_column, search_term, sql_column_or_array_index)
@@ -145,6 +153,10 @@ module Effective
       return true unless assoc.belongs_to? || assoc.has_one?
 
       attributes[assoc.foreign_key].blank?
+    end
+
+    def searched_collection
+      elasticsearch_tool.search(collection)
     end
   end
 end

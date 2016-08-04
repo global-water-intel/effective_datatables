@@ -11,6 +11,7 @@ module Effective
       # And then run any array_columns through in post-processed results
       def table_data
         col = collection
+        es_response = nil
 
         if active_record_collection?
           col = table_tool.order(col)
@@ -28,6 +29,8 @@ module Effective
         elsif elasticsearch_collection?
           col = elasticsearch_tool.order(col)
           col = elasticsearch_tool.search(col)
+
+          es_response = col
 
           self.display_records = elasticsearch_tool.total_entries(col)
         end
@@ -53,7 +56,7 @@ module Effective
         end
 
         self.format(col)
-        col = self.finalize(col)
+        col = self.finalize(col, es_response)
       end
 
       def arrayize(collection)

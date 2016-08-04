@@ -18,7 +18,8 @@ module Effective
             ]
           }
         },
-        sort: []
+        sort: [],
+        aggs: {}
       }
 
       self.page_size = 25
@@ -87,7 +88,52 @@ module Effective
       execute_unfiltered_count!
     end
 
+    def aggregate_for(field, type, option = nil)
+      key = agg_key(field, type, option)
+
+      raw = response.aggregations[key]['buckets']
+
+      case type
+      when :date
+        Hash[raw.map { |h| [h['key_as_string'], h['doc_count']] }]
+      else
+        Hash[raw.map { |h| [h['key'], h['doc_count']] }]
+      end
+    end
+
+    def add_aggregate(field, type, option = nil)
+      key = agg_key(field, type, option)
+
+      case type
+      when :date
+        search_options[:aggs][key] = {
+          date_histogram: {
+            field: field,
+            interval: option
+          }
+        }
+      when :count
+        search_options[:aggs][key] = {
+          terms: {
+            field: field
+          }
+        }
+      end
+    end
+
     private
+
+    def agg_key(field, type, option)
+      "#{field}_#{type}_#{option}".downcase
+    end
+
+    # def aggregate
+
+    # end
+
+    # def date_aggregate(field, interval, agg_func)
+    #   search_options[:aggs]["#{field}_by_#{agg_func}"]
+    # end
 
     def response
       execute!

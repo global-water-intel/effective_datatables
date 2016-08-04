@@ -1,9 +1,10 @@
 module Effective
   module EffectiveDatatable
     module Hooks
-
+      attr_accessor :elasticsearch_response
       # Called on the final collection after searching, ordering, arrayizing and formatting have been completed
-      def finalize(collection) # Override me if you like
+      def finalize(collection, es_response = nil) # Override me if you like
+        self.elasticsearch_response = es_response
         collection
       end
 
