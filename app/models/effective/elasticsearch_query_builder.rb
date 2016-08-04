@@ -81,17 +81,17 @@ module Effective
     end
 
     def total_entries
-      execute_count!
+      response.total_entries
     end
 
     def unfiltered_total_entries
-      execute_unfiltered_count!
+      @unfiltered_total_entries ||= execute_unfiltered_count!
     end
 
     def aggregate_for(field, type, option = nil)
       key = agg_key(field, type, option)
 
-      raw = response.aggregations[key]['buckets']
+      raw = aggregations[key]['buckets']
 
       case type
       when :date
@@ -115,38 +115,42 @@ module Effective
       when :count
         search_options[:aggs][key] = {
           terms: {
-            field: field
+            field: field,
+            size: 0
           }
         }
       end
     end
 
+    def to_array_and_total_entries
+      @cache_execute = true
+      @arrayified ||= to_a
+      @total_entries ||= total_entries
+
+      [@arrayified, @total_entries]
+    end
+
     private
+
+    def aggregations
+      @agg_cache ||= response.aggregations
+    end
 
     def agg_key(field, type, option)
       "#{field}_#{type}_#{option}".downcase
     end
-
-    # def aggregate
-
-    # end
-
-    # def date_aggregate(field, interval, agg_func)
-    #   search_options[:aggs]["#{field}_by_#{agg_func}"]
-    # end
 
     def response
       execute!
     end
 
     def execute!
-      # binding.pry
-      active_record_klass.__elasticsearch__.search(search_options).page(page_number).per_page(page_size)
-    end
+      return @execute_result if @cache_execute && defined?(@execute_result)
 
-    def execute_count!
-      opts = search_options.merge size: 0
-      active_record_klass.__elasticsearch__.search(opts).total_entries
+      ex = active_record_klass.__elasticsearch__.search(search_options).page(page_number).per_page(page_size)
+
+      return @execute_result = ex if @cache_execute
+      ex
     end
 
     def execute_unfiltered_count!

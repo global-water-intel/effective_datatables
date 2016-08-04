@@ -11,7 +11,6 @@ module Effective
       # And then run any array_columns through in post-processed results
       def table_data
         col = collection
-        es_response = nil
 
         if active_record_collection?
           col = table_tool.order(col)
@@ -29,10 +28,6 @@ module Effective
         elsif elasticsearch_collection?
           col = elasticsearch_tool.order(col)
           col = elasticsearch_tool.search(col)
-
-          es_response = col
-
-          self.display_records = elasticsearch_tool.total_entries(col)
         end
 
         if array_tool.search_terms.present?
@@ -46,7 +41,7 @@ module Effective
           col = array_tool.order(col)
         end
 
-        self.display_records ||= total_records
+        self.display_records ||= total_records unless elasticsearch_collection?
 
         if col.kind_of?(Array)
           col = array_tool.paginate(col)
@@ -56,13 +51,16 @@ module Effective
         end
 
         self.format(col)
-        col = self.finalize(col, es_response)
+        col = self.finalize(col)
       end
 
       def arrayize(collection)
         return collection if @arrayized  # Prevent the collection from being arrayized more than once
         @arrayized = true
-        collection = collection.to_a
+
+        if elasticsearch_collection?
+          collection, self.display_records = collection.to_array_and_total_entries
+        end
 
         # We want to use the render :collection for each column that renders partials
         rendered = {}

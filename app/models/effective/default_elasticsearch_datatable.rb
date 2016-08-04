@@ -62,7 +62,7 @@ module Effective
     end
 
     def collection
-      # return @elasticsearch_collection if defined?(@elasticsearch_collection)
+      return @elasticsearch_collection if defined?(@elasticsearch_collection)
 
       base = record_class.es_query
       base.dt_query({ 'name' => 'created_at', 'type' => :datetime }, attributes[:created_at]) if attributes[:created_at].present?
