@@ -75,8 +75,8 @@ module Effective
     end
 
     module ClassMethods
-      def public_attributes
-        raise NotImplementedError
+      def public_attributes_for_elasticsearch
+        public_attributes
       end
 
       def es_query

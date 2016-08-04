@@ -10,7 +10,7 @@ module Effective
     datatable do
       table_column :id, type: :integer
       default_order :id
-      self.class.name.demodulize.singularize.constantize.public_attributes.each.with_index do |col, i|
+      self.class.name.demodulize.singularize.constantize.public_attributes_for_elasticsearch.each.with_index do |col, i|
         visibility = i < DEFAULT_VISIBLE_COLUMN_LIMIT
         if belongs_to_column?(col) || has_one_column?(col)
           if polymorphic_bt_column?(col)
