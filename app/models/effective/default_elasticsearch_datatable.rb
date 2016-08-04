@@ -1,6 +1,5 @@
 module Effective
   class DefaultElasticsearchDatatable < Effective::Datatable
-    delegate :aggregate_for, to: :searched_collection
     attr_writer :select_overrides
     DEFAULT_VISIBLE_COLUMN_LIMIT = 7
 
@@ -94,7 +93,20 @@ module Effective
       []
     end
 
-    def register_elasticsearch_aggregates(_collection)
+    def aggregate_definitions
+      {}
+    end
+
+    def aggregate_for(aggregate_name)
+      field, type, option = aggregate_definitions[aggregate_name]
+
+      searched_collection.aggregate_for(field, type, option)
+    end
+
+    def register_elasticsearch_aggregates(col)
+      aggregate_definitions.each do |_, v|
+        col.add_aggregate(*v)
+      end
     end
 
     def search_column(collection, table_column, search_term, sql_column_or_array_index)

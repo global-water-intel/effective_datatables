@@ -100,7 +100,7 @@ module Effective
       @json ||= begin
         data = table_data
 
-        {
+        json = {
           :draw => (params[:draw] || 0),
           :data => (data || []),
           :recordsTotal => (total_records || 0),
@@ -108,6 +108,12 @@ module Effective
           :aggregates => (aggregate_data(data) || []),
           :charts => (charts_data || {})
         }
+
+        if charts?
+          json[:chartRedraw] = view.render(partial: charts_partial, locals: { datatable: self, column_size: attributes[:column_size] })
+        end
+
+        json
       end
     end
 
@@ -181,6 +187,14 @@ module Effective
       @simple == true
     end
 
+    def charts?
+      charts_partial.present?
+    end
+
+    def charts_partial
+      attributes[:charts_partial]
+    end
+
     protected
 
     def params
@@ -210,6 +224,5 @@ module Effective
     def array_collection?
       collection.kind_of?(Array) && collection.first.kind_of?(Array)
     end
-
   end
 end

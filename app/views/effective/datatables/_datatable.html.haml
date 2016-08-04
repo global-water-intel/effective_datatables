@@ -16,6 +16,9 @@
     }
   }
 
+- if datatable.charts?
+  = render partial: datatable.charts_partial, locals: { datatable: datatable }
+
 %table.effective-datatable{effective_datatable_params}
   %thead
     %tr

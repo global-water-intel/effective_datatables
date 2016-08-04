@@ -7,14 +7,6 @@ module EffectiveDatatablesHelper
       locals: { datatable: datatable, input_js_options: input_js_options.try(:to_json) }
   end
 
-  def render_datatable_with_charts(datatable, charts_partial, input_js_options = nil)
-    return unless datatable.present?
-    datatable.view ||= self
-
-    render partial: 'effective/datatables/datatable_with_charts',
-      locals: { datatable: datatable, input_js_options: input_js_options.try(:to_json), charts_partial: charts_partial }
-  end
-
   def render_datatable_scopes(datatable)
     return unless datatable.scopes.present?
     datatable.view ||= self
