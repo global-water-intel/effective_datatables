@@ -12,10 +12,13 @@ module Effective
       self.active_record_klass = klass
       self.search_options = {
         query: {
-          bool: {
-            must: [
-              { match_all: {} }
-            ]
+          filtered: {
+            filter: {
+              bool: {
+                must: [
+                ]
+              }
+            }
           }
         },
         sort: [],
@@ -35,30 +38,31 @@ module Effective
 
     def dt_query(table_column, term)
       name = table_column['name']
+      name_for_searching = active_record_klass.field_name_for_search(name)
 
       case table_column['type']
       when :string, :text
         query wildcard: { name => "*#{term.downcase}*" }
         # query match: { name => term }
       when :foreign_key
-        query match: { name => term }
+        filter term: { name => term }
       when :datetime
-        query match: { name => term }
+        query wildcard: { name_for_searching => "*#{term}*" }
       else
-        name_for_searching = active_record_klass.field_name_for_search(name)
         query wildcard: { name_for_searching => "*#{term.to_s.downcase}*" }
         # query match: { name => term }
       end
     end
 
-    def query(hash = {})
-      search_options[:query][:bool][:must] << hash
+    def filter(hash = {})
+      search_options[:query][:filtered][:filter][:bool][:must] << hash
 
       self
     end
 
-    def filter(hash = {})
-      raise NotImplementedError
+    def query(hash = {})
+      search_options[:query][:filtered][:filter][:bool][:must] << { query: hash }
+
       self
     end
 

@@ -40,8 +40,8 @@ module Effective
         end
       end
 
-      table_column :created_at, visible: false
-      table_column :updated_at, visible: false
+      table_column :created_at, visible: false, type: :datetime
+      table_column :updated_at, visible: false, type: :datetime
 
       actions_column destroy: false
       bulk_actions_column do
