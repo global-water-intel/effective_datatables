@@ -34,6 +34,10 @@ module Effective
           table_column col, visible: visibility, type: type_for_attribute(col) do |record|
             record.send(col).to_s
           end
+        elsif type_for_attribute(col) == :decimal
+          table_column col, visible: visibility, type: type_for_attribute(col) do |record|
+            number_with_delimiter record.send(col).to_f
+          end
         else
           table_column col, visible: visibility, type: type_for_attribute(col)
         end
@@ -85,7 +89,7 @@ module Effective
     end
 
     def type_for_attribute(col)
-      record_class.type_for_attribute(col).type
+      record_class.type_for_attribute(col.to_s).type
     end
 
     def serialized_column?(col)

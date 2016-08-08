@@ -92,8 +92,8 @@ module Effective
       @unfiltered_total_entries ||= execute_unfiltered_count!
     end
 
-    def aggregate_for(field, type, option = nil)
-      key = agg_key(field, type, option)
+    def aggregate_for(field, type, options = {})
+      key = agg_key(field, type, options.to_s)
 
       raw = aggregations[key]['buckets']
 
@@ -105,7 +105,7 @@ module Effective
       end
     end
 
-    def add_aggregate(field, type, option = nil)
+    def add_aggregate(field, type, options = {})
       key = agg_key(field, type, option)
 
       case type

@@ -68,6 +68,8 @@ initializeDataTables = ->
       input_js_options['buttons'] = []
 
     init_options =
+      displayStart: datatable.data('display-start')
+      pageLength: datatable.data('page-length')
       ajax: { url: datatable.data('source'), type: 'POST' }
       autoWidth: false
       buttons: extraButtons.concat(baseButtons)

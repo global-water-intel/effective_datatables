@@ -92,8 +92,12 @@ module Effective
         end
       end
 
+      def display_start
+        params[:start].to_i
+      end
+
       def page
-        params[:start].to_i / per_page + 1
+        display_start / per_page + 1
       end
 
     end
