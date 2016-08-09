@@ -8,11 +8,11 @@ module Effective
       settings_options = {
         index: {
           number_of_shards: 1,
-          cache: {
-            query: {
-              enable: true
-            }
-          }
+          # cache: {
+          #   query: {
+          #     enable: false
+          #   }
+          # }
         },
         analysis: {
           analyzer: {
@@ -33,7 +33,9 @@ module Effective
             name_for_searching = klass.field_name_for_search(name)
 
             case column.type
-            when :string, :text
+            when :string
+              indexes name, analyzer: :case_insensitive
+            when :text
               indexes name, analyzer: :case_insensitive
             when :integer
               if klass.defined_enums.keys.include?(name)
@@ -71,14 +73,16 @@ module Effective
             end
           end
 
-          instance_exec(&klass.elasticsearch_index_hook)
+          instance_exec('', &klass.indexes_extras)
         end
       end
     end
 
     module ClassMethods
-      def elasticsearch_index_hook
-        -> {}
+      def indexes_extras
+        return ->(_) {} unless respond_to?(:elasticsearch_index_hook)
+
+        elasticsearch_index_hook
       end
 
       def public_attributes_for_elasticsearch

@@ -92,16 +92,16 @@ module Effective
       @unfiltered_total_entries ||= execute_unfiltered_count!
     end
 
-    def aggregate_for(field, type, options = {})
-      es_agg = ElasticsearchAggregate.new(field, type, options)
+    def aggregate_for(type, field, options = {})
+      es_agg = ElasticsearchAggregate.new(type, field, options)
 
       es_agg.results_as_hash_from(aggregations)
     end
 
-    def add_aggregate(field, type, options = {})
-      es_agg = ElasticsearchAggregate.new(field, type, options)
+    def add_aggregate(type, field, options = {})
+      es_agg = ElasticsearchAggregate.new(type, field, options)
 
-      search_options[:aggs][es_agg.key] = es_agg.body
+      search_options[:aggs] = es_agg.register_options(search_options[:aggs])
     end
 
     def to_array_and_total_entries
@@ -139,7 +139,7 @@ module Effective
 
     def execute_unfiltered_count!
       opts = { size: 0 }
-      # binding.pry
+
       active_record_klass.__elasticsearch__.search(opts).total_entries
     end
   end

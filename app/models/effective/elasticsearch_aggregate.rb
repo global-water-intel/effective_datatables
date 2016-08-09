@@ -1,11 +1,11 @@
 module Effective
   class ElasticsearchAggregate
-    attr_accessor :field, :type, :options
+    attr_accessor :type, :field, :options
 
-    def initialize(field, type, options)
-      self.field = field
+    def initialize(type, field, options)
       self.type = type
-      self.options = options
+      self.field = field
+      self.options = options.presence || {}
     end
 
     def key
@@ -13,63 +13,122 @@ module Effective
     end
 
     def body
-      base = {}
+      @body = {}
+
       case type
-      when :date
-        base[key] = {
+      when :date_histogram_count, :date_histogram_sum_with_filter
+        @body[key] = {
           date_histogram: {
             field: field,
             interval: options[:interval]
           }
         }
 
-        # if options.has_key?(:sum_over)
-        #   search_options[:aggs][key][:aggs] = {
-        #     "#{key}-2" => {
-        #       sum: {
-        #         field: options[:sum_over]
-        #       }
-        #     }
-        #   }
-        # end
+        if type == :date_histogram_sum_with_filter
+          @body[key][:aggs] = {
+            key_2 => {
+              stats: { field: options[:sum_over] }
+            }
+          }
 
-        # if options.has_key?(:filter)
-        #   old_search = search_options[:aggs].delete(key)
+          old_body = @body.delete(key)
 
+          @body[key] = {
+            aggs: { key_3 => old_body }
+          }
 
-        #   search_options[:aggs][key][:filter] = {
-        #     term: options[:filter]
-        #   }
-        # end
-      when :count
-        base[key] = {
+          @body[key][:filter] = if options[:filter].present?
+                                  {
+                                    term: options[:filter]
+                                  }
+                                else
+                                  {
+                                    exists: { field: 'id' }
+                                  }
+                                end
+        end
+      when :terms_count
+        @body[key] = {
           terms: {
             field: field,
             size: 0
           }
         }
+      when :filtered_terms_sum
+        filter_with_default = if options[:filter].present?
+                                {
+                                  term: options[:filter]
+                                }
+                              else
+                                {
+                                  exists: { field: 'id' }
+                                }
+                              end
+        @body[key] = {
+          filter: filter_with_default,
+          aggs: {
+            key_3 => {
+              terms: { field: field, size: 0 },
+              aggs: {
+                key_2 => {
+                  stats: { field: options[:sum_over] }
+                }
+              }
+            }
+          }
+        }
+      else
+        binding.pry
       end
+
+      @body
     end
 
     def results_as_hash_from(aggregations)
-      raw = aggregations[key]['buckets']
-
       case type
-      when :date
+      when :date_histogram_count
+        raw = aggregations[key]['buckets']
         Hash[raw.map { |h| [h['key_as_string'], h['doc_count']] }]
-      else
+      when :terms_count
+        raw = aggregations[key]['buckets']
+        # binding.pry
         Hash[raw.map { |h| [h['key'], h['doc_count']] }]
+      when :date_histogram_sum_with_filter
+        raw = aggregations[key][key_3]['buckets']
+        Hash[raw.map { |h| [h['key_as_string'], h[key_2]['sum']] }]
+      when :filtered_terms_sum
+        raw = aggregations[key][key_3]['buckets']
+
+        Hash[raw.map { |h| [h['key'], h[key_2]['sum']] }]
+      else
+        binding.pry
       end
     end
 
+    def register_options(query_hash)
+      query_hash.merge body
+    end
+
     private
+
+    def key_2
+      "#{key}-2"
+    end
+
+    def key_3
+      "#{key}-3"
+    end
+
+    def key_4
+      "#{key}-4"
+    end
 
     def hasher
       @hasher ||= Digest::SHA1.new
     end
 
     def agg_key
-      hasher.hexdigest "#{field}_#{type}_#{options}".downcase
+      @agg_key ||= hasher.hexdigest "#{field}_#{type}_#{options}".downcase
     end
   end
 end

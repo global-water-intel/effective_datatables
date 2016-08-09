@@ -105,11 +105,9 @@ module Effective
     end
 
     def aggregate_for(aggregate_name)
-      field, type, option = aggregate_definitions[aggregate_name]
+      field, type, options = aggregate_definitions[aggregate_name]
 
-      option ||= {}
-
-      searched_collection.aggregate_for(field, type, option)
+      searched_collection.aggregate_for(field, type, options)
     end
 
     def register_elasticsearch_aggregates(col)
