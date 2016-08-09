@@ -93,37 +93,15 @@ module Effective
     end
 
     def aggregate_for(field, type, options = {})
-      key = agg_key(field, type, options)
+      es_agg = ElasticsearchAggregate.new(field, type, options)
 
-      raw = aggregations[key]['buckets']
-
-      case type
-      when :date
-        Hash[raw.map { |h| [h['key_as_string'], h['doc_count']] }]
-      else
-        Hash[raw.map { |h| [h['key'], h['doc_count']] }]
-      end
+      es_agg.results_as_hash_from(aggregations)
     end
 
     def add_aggregate(field, type, options = {})
-      key = agg_key(field, type, options)
+      es_agg = ElasticsearchAggregate.new(field, type, options)
 
-      case type
-      when :date
-        search_options[:aggs][key] = {
-          date_histogram: {
-            field: field,
-            interval: options[:interval]
-          }
-        }
-      when :count
-        search_options[:aggs][key] = {
-          terms: {
-            field: field,
-            size: 0
-          }
-        }
-      end
+      search_options[:aggs][es_agg.key] = es_agg.body
     end
 
     def to_array_and_total_entries
@@ -138,14 +116,6 @@ module Effective
 
     def aggregations
       @agg_cache ||= response.aggregations
-    end
-
-    def hasher
-      @hasher ||= Digest::SHA1.new
-    end
-
-    def agg_key(field, type, options)
-      hasher.hexdigest "#{field}_#{type}_#{options}".downcase
     end
 
     def response
