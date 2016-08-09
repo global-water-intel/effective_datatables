@@ -41,7 +41,7 @@ module Effective
       name_for_searching = active_record_klass.field_name_for_search(name)
 
       case table_column['type']
-      when :string, :text
+      when :string, :text, :enumeration
         query wildcard: { name => "*#{term.downcase}*" }
         # query match: { name => term }
       when :foreign_key, :exact_string

@@ -38,6 +38,8 @@ module Effective
           table_column col, visible: visibility, type: type_for_attribute(col) do |record|
             number_with_delimiter record.send(col).to_f
           end
+        elsif enumeration?(col)
+          table_column col, visible: visibility, type: :enumeration
         else
           table_column col, visible: visibility, type: type_for_attribute(col)
         end
@@ -56,6 +58,10 @@ module Effective
 
     def belongs_to_column?(col)
       record_class.reflections[col.to_s].try :belongs_to?
+    end
+
+    def enumeration?(col)
+      record_class.defined_enums.keys.include?(col.to_s)
     end
 
     def polymorphic_bt_column?(col)
