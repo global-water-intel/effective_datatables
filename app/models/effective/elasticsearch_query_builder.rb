@@ -125,6 +125,12 @@ module Effective
     def execute!
       return @execute_result if @cache_execute && defined?(@execute_result)
 
+      # Don't modify #search_options once we've performed the search.
+      # The search won't get run again.
+      # Any modifications would just have no effect.
+      # Not sure if there's a point to juggling @cache_execute if we're just gonna freeze always.
+      search_options.freeze
+
       ex = active_record_klass.__elasticsearch__.search(search_options).page(page_number).per_page(page_size)
 
       return @execute_result = ex if @cache_execute
