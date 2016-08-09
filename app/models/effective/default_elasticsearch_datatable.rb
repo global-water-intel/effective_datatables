@@ -107,6 +107,8 @@ module Effective
     def aggregate_for(aggregate_name)
       field, type, option = aggregate_definitions[aggregate_name]
 
+      option ||= {}
+
       searched_collection.aggregate_for(field, type, option)
     end
 

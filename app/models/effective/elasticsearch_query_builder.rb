@@ -93,7 +93,7 @@ module Effective
     end
 
     def aggregate_for(field, type, options = {})
-      key = agg_key(field, type, options.to_s)
+      key = agg_key(field, type, options)
 
       raw = aggregations[key]['buckets']
 
@@ -106,14 +106,14 @@ module Effective
     end
 
     def add_aggregate(field, type, options = {})
-      key = agg_key(field, type, option)
+      key = agg_key(field, type, options)
 
       case type
       when :date
         search_options[:aggs][key] = {
           date_histogram: {
             field: field,
-            interval: option
+            interval: options[:interval]
           }
         }
       when :count
@@ -140,8 +140,12 @@ module Effective
       @agg_cache ||= response.aggregations
     end
 
-    def agg_key(field, type, option)
-      "#{field}_#{type}_#{option}".downcase
+    def hasher
+      @hasher ||= Digest::SHA1.new
+    end
+
+    def agg_key(field, type, options)
+      hasher.hexdigest "#{field}_#{type}_#{options}".downcase
     end
 
     def response
