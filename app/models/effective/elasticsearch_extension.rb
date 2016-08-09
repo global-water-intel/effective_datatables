@@ -85,6 +85,10 @@ module Effective
         elasticsearch_index_hook
       end
 
+      def visible_column_limit
+        7
+      end
+
       def public_attributes_for_elasticsearch
         public_attributes
       end

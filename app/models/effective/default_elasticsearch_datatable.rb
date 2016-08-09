@@ -1,17 +1,14 @@
 module Effective
   class DefaultElasticsearchDatatable < Effective::Datatable
     attr_writer :select_overrides
-    DEFAULT_VISIBLE_COLUMN_LIMIT = 7
 
     scopes do
       define_scopes.call
     end
 
     datatable do
-      table_column :id, type: :integer
-      default_order :id
-      self.class.name.demodulize.singularize.constantize.public_attributes_for_elasticsearch.each.with_index do |col, i|
-        visibility = i < DEFAULT_VISIBLE_COLUMN_LIMIT
+      public_attributes_for_elasticsearch.each.with_index do |col, i|
+        visibility = i < visible_column_limit
         if belongs_to_column?(col) || has_one_column?(col)
           if polymorphic_bt_column?(col)
             table_column col, visible: true, filter: false, sortable: false do |record|
@@ -40,13 +37,14 @@ module Effective
           end
         elsif enumeration?(col)
           table_column col, visible: visibility, type: :enumeration
+        elsif has_many?(col)
+          table_column col, visible: visibility, type: type_for_attribute(col) do |record|
+            record.send(col).map(&:to_s).join('<br><hr>')
+          end
         else
           table_column col, visible: visibility, type: type_for_attribute(col)
         end
       end
-
-      table_column :created_at, visible: false, type: :datetime
-      table_column :updated_at, visible: false, type: :datetime
 
       actions_column destroy: false
       if save_state?
@@ -66,6 +64,10 @@ module Effective
 
     def polymorphic_bt_column?(col)
       belongs_to_column?(col) && record_class.reflections[col.to_s].try(:polymorphic?)
+    end
+
+    def has_many?(col)
+      record_class.reflections[col.to_s].try :collection?
     end
 
     def has_one_column?(col)
@@ -149,6 +151,14 @@ module Effective
 
     def record_class
       self.class.name.demodulize.singularize.constantize
+    end
+
+    def public_attributes_for_elasticsearch
+      record_class.public_attributes_for_elasticsearch
+    end
+
+    def visible_column_limit
+      record_class.visible_column_limit
     end
 
     def belongs_to_associations
