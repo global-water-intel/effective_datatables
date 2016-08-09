@@ -11,12 +11,12 @@ module Effective
         visibility = i < visible_column_limit
         if belongs_to_column?(col) || has_one_column?(col)
           if polymorphic_bt_column?(col)
-            table_column col, visible: true, filter: false, sortable: false do |record|
+            table_column col, visible: true, filter: { as: :text } do |record|
               assoc = record.send(col)
 
               next if assoc.blank?
 
-              link_to assoc, assoc
+              link_to assoc.to_s, assoc
             end
           else
             table_column col, visible: visibility && belongs_to_visible?(col), filter: belongs_to_filter(col) do |record|
