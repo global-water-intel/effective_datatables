@@ -36,7 +36,10 @@ module Effective
             number_with_delimiter record.send(col).to_f
           end
         elsif enumeration?(col)
-          table_column col, visible: visibility, type: :enumeration
+          table_column col,
+                       visible: visibility,
+                       type: :enumeration,
+                       filter: { type: :select, collection: enumeration_options(col) }
         elsif has_many?(col)
           table_column col, visible: visibility, type: type_for_attribute(col) do |record|
             record.send(col).map(&:to_s).join('<br><hr>')
@@ -46,12 +49,16 @@ module Effective
         end
       end
 
-      actions_column destroy: false
+      actions_column actions_column_options
       if save_state?
         bulk_actions_column do
           # bulk_action 'Test', test_path, data: { method: :post, resource_method: :id }
         end
       end
+    end
+
+    def actions_column_options
+      { destroy: false }
     end
 
     def belongs_to_column?(col)
@@ -60,6 +67,11 @@ module Effective
 
     def enumeration?(col)
       record_class.defined_enums.keys.include?(col.to_s)
+    end
+
+    def enumeration_options(col)
+      pluralized = col.pluralize
+      record_class.send(pluralized).map { |k, _| [k, k] }
     end
 
     def polymorphic_bt_column?(col)
