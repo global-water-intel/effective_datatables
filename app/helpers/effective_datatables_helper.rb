@@ -117,7 +117,7 @@ module EffectiveDatatablesHelper
       form.input name, label: false, required: false, value: value,
         as: (ActionView::Helpers::FormBuilder.instance_methods.include?(:effective_select) ? :effective_select : :select),
         collection: opts[:filter][:collection],
-        selected: opts[:filter][:selected],
+        selected: value, # TODO: replacing opts[:filter][:selected] this is naughty but I'm not sure how to getthe select filter preloaded when using save_state
         multiple: opts[:filter][:multiple] == true,
         include_blank: include_blank,
         input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
