@@ -2,7 +2,7 @@ module Effective
   class ElasticsearchQueryBuilder
     include Enumerable
 
-    attr_accessor :active_record_klass, :search_options, :page_number, :page_size
+    attr_accessor :active_record_klass, :search_options, :page_number, :page_size, :nested_filter_map
 
     def self.select_size_limit
       50
@@ -59,6 +59,13 @@ module Effective
             tc[:modifier] => search_term
           }
         }
+      when :nested
+        nested_filter tc[:nested_path], {
+          # range: {
+          #   name => { gt: search_term }
+          # }
+          term: { name => search_term }
+        }
       else
         query wildcard: { name_for_searching => "*#{search_term.to_s.downcase}*" }
         # query match: { name => term }
@@ -73,6 +80,26 @@ module Effective
 
     def query(hash = {})
       search_options[:query][:filtered][:filter][:bool][:must] << { query: hash }
+
+      self
+    end
+
+    def nested_filter(path, hash = {})
+      self.nested_filter_map ||= {}.with_indifferent_access
+      if nested_filter_map[path].blank?
+        nested_filter_map[path] = {
+          path: path,
+          filter: {
+            bool: {
+              must: [
+              ]
+            }
+          }
+        }
+        search_options[:query][:filtered][:filter][:bool][:must] << { nested: nested_filter_map[path] }
+      end
+
+      nested_filter_map[path][:filter][:bool][:must] << hash
 
       self
     end
