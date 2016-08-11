@@ -98,7 +98,7 @@ module Effective
         next if a_id.blank?
 
         opts = { 'name' => foreign_key, 'type' => :foreign_key }
-        base = base.dt_query opts, a_id
+        base = base.dt_query a_id, opts
       end
 
       register_elasticsearch_aggregates(base)
@@ -149,7 +149,7 @@ module Effective
 
       if select_overrides.include?(name)
         tc = { 'name' => "#{name}_id", 'type' => :foreign_key }
-        collection.dt_query(tc, search_term)
+        collection.dt_query(search_term, tc)
       else
         super
       end

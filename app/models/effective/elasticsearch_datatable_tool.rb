@@ -48,7 +48,7 @@ module Effective
     end
 
     def search_column_with_defaults(collection, table_column, term, sql_column)
-      collection.dt_query(table_column, term)
+      collection.dt_query(term, table_column)
     end
 
     def paginate(collection)

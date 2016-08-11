@@ -40,20 +40,28 @@ module Effective
       response.records.for_elasticsearch
     end
 
-    def dt_query(table_column, term)
-      name = table_column['name']
+    def dt_query(search_term, table_column)
+      tc = table_column.with_indifferent_access
+      name = tc[:name]
       name_for_searching = active_record_klass.field_name_for_search(name)
 
-      case table_column['type']
+      case tc[:type]
       when :string, :text, :enumeration
-        query wildcard: { name => "*#{term.downcase}*" }
+        query wildcard: { name => "*#{search_term.downcase}*" }
         # query match: { name => term }
       when :foreign_key, :exact_string, :boolean
-        filter term: { name => term }
+        filter term: { name => search_term }
       when :datetime
-        query wildcard: { name_for_searching => "*#{term}*" }
+        query wildcard: { name_for_searching => "*#{search_term}*" }
+      when :date_range
+        query range: {
+          name => {
+            tc[:modifier] => search_term,
+            format: 'yyyy-MM-dd'
+          }
+        }
       else
-        query wildcard: { name_for_searching => "*#{term.to_s.downcase}*" }
+        query wildcard: { name_for_searching => "*#{search_term.to_s.downcase}*" }
         # query match: { name => term }
       end
     end
