@@ -4,81 +4,84 @@ module Effective
 
     included do
       include Elasticsearch::Model
-      index_name "#{table_name}_#{Rails.env}".downcase
-      settings_options = {
-        index: {
-          number_of_shards: 1,
-          # cache: {
-          #   query: {
-          #     enable: false
-          #   }
-          # }
-        },
-        analysis: {
-          analyzer: {
-            case_insensitive: {
-              filter: ['lowercase'],
-              type: 'custom',
-              tokenizer: 'keyword'
-            }
-          }
-        }
-      }
-      settings(settings_options) do
-        mapping do
-          klass = type.classify.constantize
-
-          klass.columns.each do |column|
-            name = column.name
-            name_for_searching = klass.field_name_for_search(name)
-
-            case column.type
-            when :string
-              indexes name, analyzer: :case_insensitive
-            when :text
-              indexes name, analyzer: :case_insensitive
-            when :integer
-              if klass.defined_enums.keys.include?(name)
-                indexes name, index: :not_analyzed, type: :string
-              else
-                indexes name, index: :not_analyzed, type: :integer
-                indexes name_for_searching, index: :not_analyzed, type: :string
-
-                indexes name.gsub('_id', ''), analyzer: :case_insensitive if klass.belongs_to_column?(column.name)
-              end
-            when :datetime, :date
-              indexes name, index: :not_analyzed, type: :date, format: :date
-              indexes name_for_searching, index: :not_analyzed, type: :string
-            when :decimal
-              indexes name, index: :not_analyzed, type: :float
-              indexes name_for_searching, index: :not_analyzed, type: :string
-            when :boolean
-              indexes name, index: :not_analyzed, type: :boolean
-            when :spatial
-              # TODO: figure out what we do with spatial columns. Ignoring at the moment.
-            when :uuid
-              indexes name, index: :not_analyzed, type: :string
-            else
-              binding.pry
-            end
-          end
-
-          klass.reflections.values.each do |reflection|
-
-            if reflection.has_one?
-              name = reflection.name
-
-              indexes name, analyzer: :case_insensitive
-              indexes "#{name}_id", index: :not_analyzed, type: :integer
-            end
-          end
-
-          instance_exec('', &klass.indexes_extras)
-        end
-      end
     end
 
     module ClassMethods
+      def elasticsearch_initialize
+        index_name "#{table_name}_#{Rails.env}".downcase
+        settings_options = {
+          index: {
+            number_of_shards: 1,
+            # cache: {
+            #   query: {
+            #     enable: false
+            #   }
+            # }
+          },
+          analysis: {
+            analyzer: {
+              case_insensitive: {
+                filter: ['lowercase'],
+                type: 'custom',
+                tokenizer: 'keyword'
+              }
+            }
+          }
+        }
+        settings(settings_options) do
+          mapping do
+            klass = type.classify.constantize
+
+            klass.columns.each do |column|
+              name = column.name
+              name_for_searching = klass.field_name_for_search(name)
+
+              case column.type
+              when :string
+                indexes name, analyzer: :case_insensitive
+              when :text
+                indexes name, analyzer: :case_insensitive
+              when :integer
+                if klass.defined_enums.keys.include?(name)
+                  indexes name, index: :not_analyzed, type: :string
+                else
+                  indexes name, index: :not_analyzed, type: :integer
+                  indexes name_for_searching, index: :not_analyzed, type: :string
+
+                  indexes name.gsub('_id', ''), analyzer: :case_insensitive if klass.belongs_to_column?(column.name)
+                end
+              when :datetime, :date
+                indexes name, index: :not_analyzed, type: :date, format: :date
+                indexes name_for_searching, index: :not_analyzed, type: :string
+              when :decimal
+                indexes name, index: :not_analyzed, type: :float
+                indexes name_for_searching, index: :not_analyzed, type: :string
+              when :boolean
+                indexes name, index: :not_analyzed, type: :boolean
+              when :spatial
+                # TODO: figure out what we do with spatial columns. Ignoring at the moment.
+              when :uuid
+                indexes name, index: :not_analyzed, type: :string
+              else
+                binding.pry
+              end
+            end
+
+            klass.reflections.values.each do |reflection|
+
+              if reflection.has_one?
+                name = reflection.name
+
+                indexes name, analyzer: :case_insensitive
+                indexes "#{name}_id", index: :not_analyzed, type: :integer
+              end
+            end
+
+            instance_exec('', &klass.indexes_extras)
+          end
+        end
+      end
+
       def indexes_extras
         return ->(_) {} unless respond_to?(:elasticsearch_index_hook)
 
