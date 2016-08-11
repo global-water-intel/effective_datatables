@@ -28,6 +28,10 @@ module Effective
       self.page_size = 25
     end
 
+    def to_a
+      records.to_a
+    end
+
     def each(&block)
       records.each(&block)
     end
