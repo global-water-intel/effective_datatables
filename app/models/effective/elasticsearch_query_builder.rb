@@ -56,8 +56,7 @@ module Effective
       when :date_range
         query range: {
           name => {
-            tc[:modifier] => search_term,
-            format: 'yyyy-MM-dd'
+            tc[:modifier] => search_term
           }
         }
       else
