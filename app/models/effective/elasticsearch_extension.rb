@@ -46,7 +46,7 @@ module Effective
 
                 indexes name.gsub('_id', ''), analyzer: :case_insensitive if klass.belongs_to_column?(column.name)
               end
-            when :datetime
+            when :datetime, :date
               indexes name, index: :not_analyzed, type: :date, format: :date
               indexes name_for_searching, index: :not_analyzed, type: :string
             when :decimal
@@ -147,7 +147,7 @@ module Effective
               h[assoc] = send(assoc).try(:to_s)
             end
           end
-        when :datetime
+        when :datetime, :date
           # TODO: be sure this is formatted such that we can search/sort with it
           h[name] = send(name).try(:to_date).try :to_formatted_s, :db
           h[name_for_searching] = h[name].to_s
