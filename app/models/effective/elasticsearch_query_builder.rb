@@ -12,13 +12,9 @@ module Effective
       self.active_record_klass = klass
       self.search_options = {
         query: {
-          filtered: {
-            filter: {
-              bool: {
-                must: [
-                ]
-              }
-            }
+          bool: {
+            must: [],
+            filter: []
           }
         },
         sort: [],
@@ -73,13 +69,13 @@ module Effective
     end
 
     def filter(hash = {})
-      search_options[:query][:filtered][:filter][:bool][:must] << hash
+      search_options[:query][:bool][:filter] << hash
 
       self
     end
 
     def query(hash = {})
-      search_options[:query][:filtered][:filter][:bool][:must] << { query: hash }
+      search_options[:query][:bool][:must] << hash
 
       self
     end
