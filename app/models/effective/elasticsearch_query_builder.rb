@@ -55,12 +55,14 @@ module Effective
             tc[:modifier] => search_term
           }
         }
-      when :nested
+      when :nested_date_range
+        name_with_path = "#{tc[:nested_path]}.#{name}"
         nested_filter tc[:nested_path], {
-          # range: {
-          #   name => { gt: search_term }
-          # }
-          term: { name => search_term }
+          range: {
+            name_with_path => {
+              tc[:modifier] => search_term
+            }
+          }
         }
       else
         query wildcard: { name_for_searching => "*#{search_term.to_s.downcase}*" }
@@ -92,7 +94,7 @@ module Effective
             }
           }
         }
-        search_options[:query][:filtered][:filter][:bool][:must] << { nested: nested_filter_map[path] }
+        filter nested: nested_filter_map[path]
       end
 
       nested_filter_map[path][:filter][:bool][:must] << hash
