@@ -1,6 +1,6 @@
 .row
   .col-sm-12
-    = simple_form_for :scopes, url: request.path, method: :get, html: { class: 'form-inline' } do |form|
+    = simple_form_for :scopes, url: request.path, method: :get, html: { class: 'form-horizontal datatable-scopes' } do |form|
 
       - datatable.scopes.each do |name, options|
         - if options[:block].present?
@@ -8,8 +8,8 @@
         - elsif options[:partial].present?
           = render partial: options[:partial], locals: { form: form, f: form, datatable: datatable }
         - else
-          = form.input name, options[:filter]
+          = form.input name, options[:filter].merge(required: false, wrapper: :horizontal_form_third_col)
 
       = form.submit 'Submit', class: 'btn btn-primary', 'data-disable-with' => 'Submitting...'
-      = link_to 'Reset', '#', 'data-reset-form' => true
+      =# link_to 'Reset', '#', 'data-reset-form' => true
 
