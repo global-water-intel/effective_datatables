@@ -202,5 +202,5 @@ initializeDataTables = ->
       )
 
 $ -> initializeDataTables()
-$(document).on 'page:change', -> initializeDataTables()
+$(document).on 'page:change page:load', -> initializeDataTables()
 
