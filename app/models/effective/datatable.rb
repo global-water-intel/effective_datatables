@@ -230,7 +230,7 @@ module Effective
     end
 
     def array_collection?
-      collection.kind_of?(Array) && collection.first.kind_of?(Array)
+      collection.kind_of?(Array) && (collection.first.kind_of?(Array) || collection.blank?)
     end
   end
 end
