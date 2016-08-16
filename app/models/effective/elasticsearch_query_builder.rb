@@ -123,7 +123,7 @@ module Effective
     end
 
     def total_entries
-      response.total_entries
+      response.total_count
     end
 
     def unfiltered_total_entries
@@ -169,7 +169,7 @@ module Effective
       # Not sure if there's a point to juggling @cache_execute if we're just gonna freeze always.
       search_options.freeze
 
-      ex = active_record_klass.__elasticsearch__.search(search_options).page(page_number).per_page(page_size)
+      ex = active_record_klass.__elasticsearch__.search(search_options).page(page_number).per(page_size)
 
       return @execute_result = ex if @cache_execute
       ex
@@ -178,7 +178,7 @@ module Effective
     def execute_unfiltered_count!
       opts = { size: 0 }
 
-      active_record_klass.__elasticsearch__.search(opts).total_entries
+      active_record_klass.__elasticsearch__.search(opts).total_count
     end
   end
 end
