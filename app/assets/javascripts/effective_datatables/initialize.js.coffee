@@ -197,10 +197,10 @@ initializeDataTables = ->
       clearTimeout(timeout) if timeout
       $table.data('timeout', setTimeout( =>
           $table.DataTable().draw()
-          $.event.trigger('page:change')
+          $.event.trigger('turbolinks:load')
         , 700)
       )
 
 $ -> initializeDataTables()
-$(document).on 'page:change page:load', -> initializeDataTables()
+$(document).on 'turbolinks:load', -> initializeDataTables()
 
