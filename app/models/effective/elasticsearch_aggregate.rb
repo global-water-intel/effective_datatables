@@ -128,11 +128,11 @@ module Effective
       when :filtered_terms_multi_sum
         raw = aggregations[key][key_3]['buckets']
 
-# binding.pry
         arrays = raw.map do |h|
           val_hash = Hash[h.except('key', 'doc_count').map { |k, v| [k, v['sum']] }]
           [h['key'], val_hash]
         end
+# binding.pry
 
         Hash[arrays]
       else

@@ -63,6 +63,8 @@ module Effective
                 # TODO: figure out what we do with spatial columns. Ignoring at the moment.
               when :uuid
                 indexes name, index: :not_analyzed, type: :string
+              when nil
+                # TODO: hack to deal with spatial columns being borked in Rails 5
               else
                 binding.pry
               end
