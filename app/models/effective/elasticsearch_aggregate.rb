@@ -77,6 +77,31 @@ module Effective
             }
           }
         }
+      when :filtered_terms_multi_sum
+        sum_over = Array(options[:sum_over])
+        sum_over_aggs = {}
+        sum_over.each do |so|
+          sum_over_aggs[so] = { stats: { field: so } }
+        end
+
+        filter_with_default = if options[:filter].present?
+                                {
+                                  term: options[:filter]
+                                }
+                              else
+                                {
+                                  exists: { field: 'id' }
+                                }
+                              end
+        @body[key] = {
+          filter: filter_with_default,
+          aggs: {
+            key_3 => {
+              terms: { field: field, size: 0 },
+              aggs: sum_over_aggs
+            }
+          }
+        }
       else
         binding.pry
       end
@@ -100,6 +125,16 @@ module Effective
         raw = aggregations[key][key_3]['buckets']
 
         Hash[raw.map { |h| [h['key'], h[key_2]['sum']] }]
+      when :filtered_terms_multi_sum
+        raw = aggregations[key][key_3]['buckets']
+
+# binding.pry
+        arrays = raw.map do |h|
+          val_hash = Hash[h.except('key', 'doc_count').map { |k, v| [k, v['sum']] }]
+          [h['key'], val_hash]
+        end
+
+        Hash[arrays]
       else
         binding.pry
       end

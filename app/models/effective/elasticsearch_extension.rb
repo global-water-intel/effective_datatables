@@ -124,7 +124,7 @@ module Effective
       default_json
     end
 
-    def as_indexed_json(_options = {})
+    def as_indexed_json_base
       h = {}
       klass = self.class
 
@@ -170,14 +170,19 @@ module Effective
       end
 
       klass.reflections.values.each do |reflection|
+        next unless reflection.has_one?
 
-        if reflection.has_one?
-          name = reflection.name
+        name = reflection.name
 
-          h[name] = send(name).try(:to_s)
-          h["#{name}_id"] = send(name).try(:id)
-        end
+        h[name] = send(name).try(:to_s)
+        h["#{name}_id"] = send(name).try(:id)
       end
+
+      h
+    end
+
+    def as_indexed_json(_options = {})
+      h = as_indexed_json_base
 
       as_indexed_json_hook(h)
 
