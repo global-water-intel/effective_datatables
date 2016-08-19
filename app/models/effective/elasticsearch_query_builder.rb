@@ -153,6 +153,7 @@ module Effective
     private
 
     def aggregations
+      @cache_execute = true
       @agg_cache ||= response.aggregations
     end
 
