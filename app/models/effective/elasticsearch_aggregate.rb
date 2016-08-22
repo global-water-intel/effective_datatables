@@ -163,7 +163,7 @@ module Effective
     end
 
     def agg_key
-      @agg_key ||= hasher.hexdigest "#{field}_#{type}_#{options}".downcase
+      @agg_key ||= "#{field}-#{type}-#{hasher.hexdigest("#{field}_#{type}_#{options}".downcase)}"
     end
   end
 end
