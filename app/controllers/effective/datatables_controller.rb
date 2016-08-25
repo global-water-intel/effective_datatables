@@ -43,6 +43,8 @@ module Effective
         :data => [],
         :recordsTotal => 0,
         :recordsFiltered => 0,
+        :aggregates => [],
+        :charts => {}
       }.to_json
     end
 

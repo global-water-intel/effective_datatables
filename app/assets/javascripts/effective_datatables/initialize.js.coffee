@@ -201,6 +201,12 @@ initializeDataTables = ->
         , 700)
       )
 
+destroyDataTables = ->
+  $('table.effective-datatable').each ->
+    if $.fn.DataTable.fnIsDataTable(this)
+      $(this).DataTable().destroy()
+
 $ -> initializeDataTables()
 $(document).on 'turbolinks:load', -> initializeDataTables()
+$(document).on 'turbolinks:before-cache', -> destroyDataTables()
 

@@ -222,7 +222,7 @@ module Effective
     end
 
     def active_record_collection?
-      collection.ancestors.include?(ActiveRecord::Base) rescue false
+      @active_record_collection ||= (collection.ancestors.include?(ActiveRecord::Base) rescue false)
     end
 
     def elasticsearch_collection?
