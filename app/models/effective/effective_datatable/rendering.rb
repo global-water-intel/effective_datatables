@@ -17,13 +17,7 @@ module Effective
           col = table_tool.search(col)
 
           if table_tool.search_terms.present? && array_tool.search_terms.blank?
-            if collection_class.connection.respond_to?(:unprepared_statement)
-              # https://github.com/rails/rails/issues/15331
-              col_sql = collection_class.connection.unprepared_statement { col.to_sql }
-              self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col_sql}) AS datatables_filtered_count").first.values.first rescue 1).to_i
-            else
-              self.display_records = (collection_class.connection.execute("SELECT COUNT(*) FROM (#{col.to_sql}) AS datatables_filtered_count").first.values.first rescue 1).to_i
-            end
+            self.display_records = active_record_collection_size(col)
           end
         end
 
@@ -133,6 +127,8 @@ module Effective
                 (obj.send(:roles) rescue [])
               elsif obj.kind_of?(Array) # Array backed collection
                 obj[opts[:array_index]]
+              elsif opts[:sql_as_column]
+                obj[name]
               else
                 obj.send(name)
               end

@@ -23,6 +23,7 @@ table.dataTable thead .sorting_desc:after { content: ''; }
 table.dataTable thead > tr > th.sorting_asc,
 table.dataTable thead > tr > th.sorting_desc,
 table.dataTable thead > tr > th.sorting {
+  background-repeat: no-repeat;
   padding-right: 18px;
 }
 
@@ -34,7 +35,6 @@ table.dataTable thead tr th {
   padding: 6px;
 
   .form-group { margin-bottom: 0px; font-weight: normal; }
-
 }
 
 table.dataTable td ul {
@@ -143,30 +143,6 @@ div.dataTables_wrapper div.dataTables_info {
   padding: 10px 0px 0px 6px;
 }
 
-// Pagination
-.dataTables_paginate {
-  overflow: hidden;
-
-  .pagination {
-    padding: 0px;
-
-    .paginate_button {
-      padding: 0px;
-
-      &:hover {
-        background: none;
-        border: 1px solid transparent;
-      }
-
-      &:active {
-        background: none;
-        box-shadow: none;
-        outline: none;
-      }
-    }
-  }
-}
-
 // Collapsed responsive view
 table.dataTable > tbody > tr.child span.dtr-title { min-width: 175px; }
 table.dataTable > tbody > tr.child span.dtr-data { white-space: nowrap; }
@@ -179,4 +155,8 @@ table.dataTable.dtr-inline.collapsed > tbody > tr:not(.child) > th:first-child {
 // Column specific adjustments
 table.dataTable tbody {
   td.col-price { text-align: right; }
+
+  td.col-bulk_actions {
+    input[type='checkbox'] { margin-left: 3px; }
+  }
 }
