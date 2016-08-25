@@ -1,5 +1,6 @@
 module Effective
   class DefaultElasticsearchDatatable < Effective::Datatable
+    attr_accessor :route_namespace
     attr_writer :select_overrides
 
     scopes do
@@ -11,20 +12,20 @@ module Effective
         visibility = i < visible_column_limit
         if belongs_to_column?(col) || has_one_column?(col)
           if polymorphic_bt_column?(col)
-            table_column col, visible: true, filter: { as: :text } do |record|
+            table_column col, visible: true, filter: { as: :text } do |record, _collection, datatable|
               assoc = record.send(col)
 
               next if assoc.blank?
 
-              link_to assoc.to_s, assoc
+              datatable.simple_link assoc
             end
           else
-            table_column col, visible: visibility && belongs_to_visible?(col), filter: belongs_to_filter(col) do |record|
+            table_column col, visible: visibility && belongs_to_visible?(col), filter: belongs_to_filter(col) do |record, _collection, datatable|
               assoc = record.send(col)
 
               next if assoc.blank?
 
-              link_to assoc, assoc
+              datatable.simple_link assoc
             end
           end
         elsif serialized_column?(col)
@@ -212,6 +213,13 @@ module Effective
 
     def searched_collection
       elasticsearch_tool.search(collection)
+    end
+
+    def simple_link(record)
+      link_label = record.to_s
+      link_target = [route_namespace, record].select(&:present?)
+
+      link_to link_label, link_target
     end
   end
 end
