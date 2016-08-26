@@ -1,6 +1,5 @@
 module Effective
   class DefaultElasticsearchDatatable < Effective::Datatable
-    attr_accessor :route_namespace
     attr_writer :select_overrides
 
     scopes do
@@ -217,9 +216,13 @@ module Effective
 
     def simple_link(record)
       link_label = record.to_s
-      link_target = [route_namespace, record].select(&:present?)
+      namespace = Array(route_namespace.presence || controller_namespace)
+      link_target = (namespace + [record]).select(&:present?)
 
       link_to link_label, link_target
+    end
+
+    def route_namespace
     end
   end
 end
