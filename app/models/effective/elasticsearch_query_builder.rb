@@ -66,6 +66,8 @@ module Effective
             }
           }
         }
+      when :terms
+        query terms: { name => search_term }
       else
         query wildcard: { name_for_searching => "*#{search_term.to_s.downcase}*" }
         # query match: { name => term }
