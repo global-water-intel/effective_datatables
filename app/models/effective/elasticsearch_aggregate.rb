@@ -102,6 +102,8 @@ module Effective
             }
           }
         }
+      when :raw
+        @body[key] = options[:raw_aggs]
       else
         binding.pry
       end
@@ -135,6 +137,8 @@ module Effective
 # binding.pry
 
         Hash[arrays]
+      when :raw
+        aggregations[key]
       else
         binding.pry
       end
