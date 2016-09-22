@@ -130,8 +130,18 @@ module Effective
       searched_collection.aggregate_for(field, type, options)
     end
 
+    def aggregates_used
+      attributes[:aggregates_used]
+    end
+
     def register_elasticsearch_aggregates(col)
-      aggregate_definitions.each do |_, v|
+      used = if aggregates_used.present?
+               aggregate_definitions.select { |k, _| aggregates_used.include?(k) }
+             else
+               aggregate_definitions
+             end
+
+      used.each do |_, v|
         col.add_aggregate(*v)
       end
     end
