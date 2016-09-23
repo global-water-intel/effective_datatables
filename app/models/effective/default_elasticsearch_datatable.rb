@@ -171,8 +171,12 @@ module Effective
       super
     end
 
+    def self.record_class
+      name.demodulize.singularize.constantize
+    end
+
     def record_class
-      self.class.name.demodulize.singularize.constantize
+      self.class.record_class
     end
 
     def public_attributes_for_elasticsearch
@@ -191,23 +195,28 @@ module Effective
       @select_overrides ||= []
     end
 
-    def belongs_to_filter(col)
-      # return false if has_one_column?(col)
+    def self.belongs_to_filter(col, select_overrides)
+      @belongs_to_filter ||= {}
+      return @belongs_to_filter[col] if @belongs_to_filter[col].present?
 
       assoc = record_class.reflections[col.to_s]
 
-      return false if assoc.blank?
+      return @belongs_to_filter[col] = false if assoc.blank?
 
       klass = assoc.class_name.constantize
 
-      return { as: :text } if klass.count > Effective::ElasticsearchQueryBuilder.select_size_limit
+      return @belongs_to_filter[col] = { as: :text } if klass.count > Effective::ElasticsearchQueryBuilder.select_size_limit
 
       select_overrides << col.to_s
 
-      {
+      @belongs_to_filter[col] = {
         as: :select,
         collection: klass.all.map { |e| [e.to_s, e.id] }.sort_by(&:first)
       }
+    end
+
+    def belongs_to_filter(col)
+      self.class.belongs_to_filter(col, select_overrides)
     end
 
     def belongs_to_visible?(col)
