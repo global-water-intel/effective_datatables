@@ -32,6 +32,10 @@ module Effective
       records.each(&block)
     end
 
+    def es_results
+      response.results
+    end
+
     def records
       response.records.for_elasticsearch
     end
@@ -51,13 +55,13 @@ module Effective
         filter term: { name => search_term }
       when :datetime
         query wildcard: { name_for_searching => "*#{search_term}*" }
-      when :date_range
+      when :range
         query range: {
           name => {
             tc[:modifier] => search_term
           }
         }
-      when :nested_date_range
+      when :nested_range
         name_with_path = "#{tc[:nested_path]}.#{name}"
         nested_filter tc[:nested_path], {
           range: {
@@ -68,6 +72,8 @@ module Effective
         }
       when :terms
         query terms: { name => search_term }
+      when :raw
+        query search_term
       else
         query wildcard: { name_for_searching => "*#{search_term.to_s.downcase}*" }
         # query match: { name => term }
