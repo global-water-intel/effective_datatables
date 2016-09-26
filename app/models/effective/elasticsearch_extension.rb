@@ -157,7 +157,7 @@ module Effective
           # TODO: be sure this is formatted such that we can search/sort with it
           h[name] = send(name).try(:to_date).try :to_formatted_s, :db
           h[name_for_searching] = h[name].to_s
-        when :decimal
+        when :decimal, :float
           h[name] = send(name).try(:to_f)
           h[name_for_searching] = h[name].to_s
         when :boolean
