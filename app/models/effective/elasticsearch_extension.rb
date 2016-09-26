@@ -54,7 +54,7 @@ module Effective
               when :datetime, :date
                 indexes name, index: :not_analyzed, type: :date, format: :date
                 indexes name_for_searching, index: :not_analyzed, type: :string
-              when :decimal
+              when :decimal, :float
                 indexes name, index: :not_analyzed, type: :float
                 indexes name_for_searching, index: :not_analyzed, type: :string
               when :boolean
