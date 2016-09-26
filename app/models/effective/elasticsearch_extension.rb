@@ -49,7 +49,10 @@ module Effective
                   indexes name, index: :not_analyzed, type: :integer
                   indexes name_for_searching, index: :not_analyzed, type: :string
 
-                  indexes name.gsub('_id', ''), analyzer: :case_insensitive if klass.belongs_to_column?(column.name)
+                  if klass.belongs_to_column?(column.name)
+                    indexes name.gsub('_id', ''), analyzer: :case_insensitive
+                    indexes "#{name.to_s.gsub('_id', '')}_raw", index: :not_analyzed
+                  end
                 end
               when :datetime, :date
                 indexes name, index: :not_analyzed, type: :date, format: :date
@@ -77,6 +80,7 @@ module Effective
 
                 indexes name, analyzer: :case_insensitive
                 indexes "#{name}_id", index: :not_analyzed, type: :integer
+                indexes "#{name.to_s.gsub('_id', '')}_raw", index: :not_analyzed
               end
             end
 
@@ -150,7 +154,7 @@ module Effective
 
             if klass.belongs_to_column?(column.name)
               assoc = column.name.gsub('_id', '')
-              h[assoc] = send(assoc).try(:to_s)
+              h[assoc] = h["#{assoc}_raw"] = send(assoc).try(:to_s)
             end
           end
         when :datetime, :date
@@ -176,7 +180,7 @@ module Effective
 
         name = reflection.name
 
-        h[name] = send(name).try(:to_s)
+        h[name] = h["#{name}_raw"] = send(name).try(:to_s)
         h["#{name}_id"] = send(name).try(:id)
       end
 
