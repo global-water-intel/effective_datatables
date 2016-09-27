@@ -209,5 +209,6 @@ destroyDataTables = ->
 
 $ -> initializeDataTables()
 $(document).on 'turbolinks:load', -> initializeDataTables()
+$(document).on 'effective-datatables:initialize', -> initializeDataTables()
 $(document).on 'turbolinks:before-cache', -> destroyDataTables()
 
