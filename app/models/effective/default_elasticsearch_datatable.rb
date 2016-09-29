@@ -1,6 +1,6 @@
 module Effective
   class DefaultElasticsearchDatatable < Effective::Datatable
-    attr_writer :select_overrides
+    mattr_accessor :select_overrides
 
     scopes do
       define_scopes.call
@@ -191,11 +191,7 @@ module Effective
       record_class.reflections.values.select(&:belongs_to?)
     end
 
-    def select_overrides
-      @select_overrides ||= []
-    end
-
-    def self.belongs_to_filter(col, select_overrides)
+    def self.belongs_to_filter(col)
       @belongs_to_filter ||= {}
       return @belongs_to_filter[col] if @belongs_to_filter[col].present?
 
@@ -207,7 +203,8 @@ module Effective
 
       return @belongs_to_filter[col] = { as: :text } if klass.count > Effective::ElasticsearchQueryBuilder.select_size_limit
 
-      select_overrides << col.to_s
+      self.select_overrides ||= []
+      self.select_overrides << col.to_s
 
       @belongs_to_filter[col] = {
         as: :select,
@@ -216,7 +213,7 @@ module Effective
     end
 
     def belongs_to_filter(col)
-      self.class.belongs_to_filter(col, select_overrides)
+      self.class.belongs_to_filter(col)
     end
 
     def belongs_to_visible?(col)
