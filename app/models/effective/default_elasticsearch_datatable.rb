@@ -157,6 +157,7 @@ module Effective
     def search_column(collection, table_column, search_term, sql_column_or_array_index)
       name = table_column['name']
 
+      self.select_overrides ||= []
       if select_overrides.include?(name)
         tc = { 'name' => "#{name}_id", 'type' => :foreign_key }
         collection.dt_query(search_term, tc)
