@@ -84,7 +84,7 @@ initializeDataTables = ->
       lengthMenu: [[5, 10, 25, 50, 100, 250, 1000, -1], ['5', '10', '25', '50', '100', '250', '1000', 'All']]
       order: datatable.data('default-order')
       processing: true
-      responsive: true
+      responsive: false
       serverParams: (params) ->
         table = this.api()
         table.columns().flatten().each (index) =>
