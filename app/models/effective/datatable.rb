@@ -203,6 +203,24 @@ module Effective
       attributes[:charts_partial]
     end
 
+    def active_record_collection_size(collection)
+      count = (collection.size rescue nil)
+
+      case count
+      when Integer
+        count
+      when Hash
+        count.size  # This represents the number of displayed datatable rows, not the sum all groups (which might be more)
+      else
+        if collection.klass.connection.respond_to?(:unprepared_statement)
+          collection_sql = collection.klass.connection.unprepared_statement { collection.to_sql }
+          (collection.klass.connection.exec_query("SELECT COUNT(*) FROM (#{collection_sql}) AS datatables_total_count").rows[0][0] rescue 1)
+        else
+          (collection.klass.connection.exec_query("SELECT COUNT(*) FROM (#{collection.to_sql}) AS datatables_total_count").rows[0][0] rescue 1)
+        end.to_i
+      end
+    end
+
     protected
 
     def params
