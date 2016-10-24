@@ -19,6 +19,7 @@ module Effective
     include Effective::EffectiveDatatable::Hooks
     include Effective::EffectiveDatatable::Options
     include Effective::EffectiveDatatable::Rendering
+    include Effective::Overrides
 
     def initialize(*args)
       if args.present? && args.first != nil
