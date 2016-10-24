@@ -1,4 +1,4 @@
 module Effective
-  class Overrides
+  module Overrides
   end
 end
