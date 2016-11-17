@@ -22,7 +22,7 @@ module Effective
           analysis: {
             analyzer: {
               case_insensitive: {
-                filter: ['lowercase'],
+                filter: %w(lowercase asciifolding),
                 type: 'custom',
                 tokenizer: 'keyword'
               }
