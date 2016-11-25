@@ -7,7 +7,8 @@ module Effective
       attributes = (params[:attributes].presence || {}).merge(referer: request.referer)
       scopes = (params[:scopes].presence || {})
 
-      @datatable = find_datatable(params[:id]).try(:new, attributes.merge(scopes).to_hash)
+      h = attributes.merge(scopes).merge(view: view_context).to_hash
+      @datatable = find_datatable(params[:id]).try(:new, h)
       @datatable.view = view_context if !@datatable.nil?
 
       EffectiveDatatables.authorized?(self, :index, @datatable.try(:collection_class) || @datatable.try(:class))

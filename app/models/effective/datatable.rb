@@ -27,6 +27,8 @@ module Effective
         args.first.each { |k, v| self.attributes[k] = v }
       end
 
+      self.view = self.attributes[:view] if self.attributes[:view].present?
+
       if respond_to?(:initialize_scopes)  # There was at least one scope defined in the scopes do .. end block
         initialize_scopes
         initialize_scope_options
