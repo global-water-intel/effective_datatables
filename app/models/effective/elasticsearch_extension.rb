@@ -20,11 +20,29 @@ module Effective
             # }
           },
           analysis: {
+            filter: {
+              nGram_filter: {
+                type: :nGram,
+                min_gram: 1,
+                max_gram: 20,
+                token_chars: %w(letter digit punctuation symbol)
+              }
+            },
             analyzer: {
               case_insensitive: {
                 filter: %w(lowercase asciifolding),
                 type: 'custom',
                 tokenizer: 'keyword'
+              },
+              nGram_analyzer: {
+                type: :custom,
+                tokenizer: :whitespace,
+                filter: %w(lowercase asciifolding nGram_filter)
+              },
+              whitespace_analyzer: {
+                type: :custom,
+                tokenizer: :whitespace,
+                filter: %w(lowercase asciifolding)
               }
             }
           }
