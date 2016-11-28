@@ -81,7 +81,7 @@ initializeDataTables = ->
       deferRender: true
       iDisplayLength: datatable.data('display-entries')
       language: { 'lengthMenu': 'Show _MENU_ per page'}
-      lengthMenu: [[5, 10, 15, 20, 25, 50, 100, 250, 1000, -1], ['5', '10', '25', '50', '100', '250', '1000', 'All']]
+      lengthMenu: [[5, 10, 15, 20, 25, 50, 100, 250, 1000, -1], ['5', '10', '15', '20', '25', '50', '100', '250', '1000', 'All']]
       order: datatable.data('default-order')
       processing: true
       responsive: false
