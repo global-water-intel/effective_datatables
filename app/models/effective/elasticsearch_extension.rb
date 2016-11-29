@@ -8,7 +8,7 @@ module Effective
 
     module ClassMethods
       def elasticsearch_initialize
-        index_name "#{Rails.application.class.parent.to_s.underscore}_#{table_name}_#{Rails.env}".downcase
+        index_name "#{Rails.application.class.parent.to_s.underscore}_#{table_name}_#{Rails.env}#{Rails.configuration.elasticsearch_suffix}".downcase
         settings_options = {
           index: {
             number_of_shards: 1,
