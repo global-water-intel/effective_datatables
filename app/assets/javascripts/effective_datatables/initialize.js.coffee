@@ -131,9 +131,11 @@ initializeDataTables = ->
 
       $.each aggregates, (row, values) =>
         $row = $tfoot.children().eq(row)
-
         if $row
-          $.each values, (col, value) => $row.children().eq(col).html(value)
+          $.each values, (col, value) =>
+            if col > 0
+              $row.children().eq(col - 1).html(value)
+
 
     drawCharts = ($table, charts) ->
       $.each charts, (name, data) =>
