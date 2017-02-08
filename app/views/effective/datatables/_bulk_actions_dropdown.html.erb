@@ -1,0 +1,17 @@
+<div class="btn-group buttons-bulk-actions">
+  <button class="btn btn-default dropdown-toggle" type='button' data-toggle='dropdown' aria-haspopup='true' aria-expanded='false' disabled='disabled'>
+    Bulk Actions
+    <span class="caret"></span>
+  </button>
+  <ul class="dropdown-menu">
+    <% if dropdown_block.respond_to?(:call) %>
+      <%= capture do %>
+        <% instance_exec(&dropdown_block) %>
+      <% end %>
+    <% else %>
+      <li>
+        <a href="#">No bulk actions</a>
+      </li>
+    <% end %>
+  </ul>
+</div>
