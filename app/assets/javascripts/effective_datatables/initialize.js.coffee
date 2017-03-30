@@ -200,7 +200,8 @@ initializeDataTables = ->
       clearTimeout(timeout) if timeout
       $table.data('timeout', setTimeout( =>
           $table.DataTable().draw()
-          $.event.trigger('turbolinks:load')
+          # TODO: not clear why this event trigger below was necessary. Disable for now as it causes ugly reinitialization issues.
+          # $.event.trigger('turbolinks:load')
         , 700)
       )
 
