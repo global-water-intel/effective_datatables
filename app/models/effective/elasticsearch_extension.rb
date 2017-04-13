@@ -4,6 +4,7 @@ module Effective
 
     included do
       include Elasticsearch::Model
+      include ElasticsearchExtras
     end
 
     module ClassMethods
@@ -26,23 +27,27 @@ module Effective
                 min_gram: 1,
                 max_gram: 20,
                 token_chars: %w(letter digit punctuation symbol)
+              },
+              our_synonyms: {
+                type: :synonym,
+                synonyms: synonyms
               }
             },
             analyzer: {
               case_insensitive: {
-                filter: %w(lowercase asciifolding),
+                filter: %w(lowercase asciifolding our_synonyms),
                 type: 'custom',
                 tokenizer: 'keyword'
               },
               nGram_analyzer: {
                 type: :custom,
                 tokenizer: :whitespace,
-                filter: %w(lowercase asciifolding nGram_filter)
+                filter: %w(lowercase asciifolding nGram_filter our_synonyms)
               },
               whitespace_analyzer: {
                 type: :custom,
                 tokenizer: :whitespace,
-                filter: %w(lowercase asciifolding)
+                filter: %w(lowercase asciifolding our_synonyms)
               }
             }
           }
