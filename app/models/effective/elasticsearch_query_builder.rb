@@ -53,6 +53,8 @@ module Effective
         # query match: { name => term }
       when :foreign_key, :exact_string, :boolean
         filter term: { name => search_term }
+      when :foreign_keys
+        filter terms: { name => search_term }
       when :datetime
         query wildcard: { name_for_searching => "*#{search_term}*" }
       when :range
@@ -71,9 +73,11 @@ module Effective
           }
         }
       when :terms
-        query terms: { name => search_term }
+        filter terms: { name => search_term }
       when :raw
         query search_term
+      when :raw_filter
+        filter search_term
       else
         query wildcard: { name_for_searching => "*#{search_term.to_s.downcase}*" }
         # query match: { name => term }
