@@ -107,9 +107,21 @@ module Effective
               end
             end
 
-            instance_exec('', &klass.indexes_extras)
+            klass.index_lambdas.each { |lmbda| instance_exec('', &lmbda) }
           end
         end
+      end
+
+      def register_es_index_lambda_before_initialize(&block)
+        index_lambda_list << block
+      end
+
+      def index_lambda_list
+        @index_lambda_list ||= []
+      end
+
+      def index_lambdas
+        index_lambda_list + [indexes_extras]
       end
 
       def indexes_extras
