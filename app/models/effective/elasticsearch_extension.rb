@@ -35,7 +35,7 @@ module Effective
             },
             analyzer: {
               case_insensitive: {
-                filter: %w(lowercase asciifolding our_synonyms),
+                filter: %w(lowercase asciifolding),
                 type: 'custom',
                 tokenizer: 'keyword'
               },
@@ -47,7 +47,7 @@ module Effective
               whitespace_analyzer: {
                 type: :custom,
                 tokenizer: :whitespace,
-                filter: %w(lowercase asciifolding our_synonyms)
+                filter: %w(lowercase asciifolding)
               }
             }
           }
