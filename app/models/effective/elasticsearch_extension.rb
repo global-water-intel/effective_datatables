@@ -21,6 +21,14 @@ module Effective
             # }
           },
           analysis: {
+            tokenizer: {
+              ngram_tokenizer: {
+                type: 'nGram',
+                min_gram: 1,
+                max_gram: 20,
+                token_chars: %w(letter digit punctuation symbol)
+              }
+            },
             filter: {
               nGram_filter: {
                 type: :nGram,
@@ -43,6 +51,11 @@ module Effective
                 type: :custom,
                 tokenizer: :whitespace,
                 filter: %w(lowercase asciifolding nGram_filter our_synonyms)
+              },
+              nGram_token_analyzer: {
+                type: :custom,
+                tokenizer: :ngram_tokenizer,
+                filter: %w(lowercase asciifolding our_synonyms)
               },
               whitespace_analyzer: {
                 type: :custom,
