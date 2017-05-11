@@ -42,26 +42,50 @@ module Effective
               }
             },
             analyzer: {
-              case_insensitive: {
+              keyword_case_insensitive: {
                 filter: %w(lowercase asciifolding),
+                char_filter: %w(html_strip),
                 type: 'custom',
                 tokenizer: 'keyword'
               },
               nGram_analyzer: {
                 type: :custom,
                 tokenizer: :whitespace,
-                filter: %w(lowercase asciifolding nGram_filter our_synonyms)
+                filter: %w(lowercase asciifolding nGram_filter our_synonyms),
+                char_filter: %w(html_strip)
               },
               nGram_token_analyzer: {
                 type: :custom,
                 tokenizer: :ngram_tokenizer,
-                filter: %w(lowercase asciifolding our_synonyms)
+                filter: %w(lowercase asciifolding our_synonyms),
+                char_filter: %w(html_strip)
               },
               whitespace_analyzer: {
                 type: :custom,
                 tokenizer: :whitespace,
-                filter: %w(lowercase asciifolding)
-              }
+                filter: %w(lowercase asciifolding),
+                char_filter: %w(html_strip)
+              },
+
+
+              whitespace_case_insensitive: {
+                type: :custom,
+                tokenizer: :whitespace,
+                filter: %w(lowercase asciifolding),
+                char_filter: %w(html_strip)
+              },
+              whitespace_case_insensitive_synonyms: {
+                filter: %w(lowercase asciifolding our_synonyms),
+                char_filter: %w(html_strip),
+                type: 'custom',
+                tokenizer: :whitespace
+              },
+              keyword_case_insensitive_synonyms: {
+                filter: %w(lowercase asciifolding our_synonyms),
+                char_filter: %w(html_strip),
+                type: 'custom',
+                tokenizer: 'keyword'
+              },
             }
           }
         }
@@ -75,9 +99,9 @@ module Effective
 
               case column.type
               when :string
-                indexes name, analyzer: :case_insensitive
+                indexes name, analyzer: :keyword_case_insensitive
               when :text
-                indexes name, analyzer: :case_insensitive
+                indexes name, analyzer: :keyword_case_insensitive
               when :integer
                 if klass.defined_enums.keys.include?(name)
                   indexes name, index: :not_analyzed, type: :string
@@ -86,7 +110,7 @@ module Effective
                   indexes name_for_searching, index: :not_analyzed, type: :string
 
                   if klass.belongs_to_column?(column.name)
-                    indexes name.gsub('_id', ''), analyzer: :case_insensitive
+                    indexes name.gsub('_id', ''), analyzer: :keyword_case_insensitive
                     indexes "#{name.to_s.gsub('_id', '')}_raw", index: :not_analyzed
                   end
                 end
@@ -114,7 +138,7 @@ module Effective
               if reflection.has_one?
                 name = reflection.name
 
-                indexes name, analyzer: :case_insensitive
+                indexes name, analyzer: :keyword_case_insensitive
                 indexes "#{name}_id", index: :not_analyzed, type: :integer
                 indexes "#{name.to_s.gsub('_id', '')}_raw", index: :not_analyzed
               end
