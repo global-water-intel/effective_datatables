@@ -23,7 +23,7 @@ module Effective
           analysis: {
             tokenizer: {
               ngram_tokenizer: {
-                type: 'nGram',
+                type: :nGram,
                 min_gram: 1,
                 max_gram: 20,
                 token_chars: %w(letter digit punctuation symbol)
@@ -45,8 +45,8 @@ module Effective
               keyword_case_insensitive: {
                 filter: %w(lowercase asciifolding),
                 char_filter: %w(html_strip),
-                type: 'custom',
-                tokenizer: 'keyword'
+                type: :custom,
+                tokenizer: :keyword
               },
               nGram_analyzer: {
                 type: :custom,
@@ -70,21 +70,21 @@ module Effective
 
               whitespace_case_insensitive: {
                 type: :custom,
-                tokenizer: :whitespace,
+                tokenizer: :standard,
                 filter: %w(lowercase asciifolding),
                 char_filter: %w(html_strip)
               },
               whitespace_case_insensitive_synonyms: {
                 filter: %w(lowercase asciifolding our_synonyms),
                 char_filter: %w(html_strip),
-                type: 'custom',
-                tokenizer: :whitespace
+                type: :custom,
+                tokenizer: :standard
               },
               keyword_case_insensitive_synonyms: {
                 filter: %w(lowercase asciifolding our_synonyms),
                 char_filter: %w(html_strip),
-                type: 'custom',
-                tokenizer: 'keyword'
+                type: :custom,
+                tokenizer: :keyword
               },
             }
           }
