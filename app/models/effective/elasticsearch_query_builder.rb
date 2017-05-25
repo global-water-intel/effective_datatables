@@ -2,7 +2,7 @@ module Effective
   class ElasticsearchQueryBuilder
     include Enumerable
 
-    attr_accessor :active_record_klass, :search_options, :page_number, :page_size, :nested_filter_map
+    attr_accessor :active_record_klass, :search_options, :page_number, :page_size, :nested_filter_map, :tiebreaker_sort
 
     def self.select_size_limit
       50
@@ -180,6 +180,10 @@ module Effective
       # The search won't get run again.
       # Any modifications would just have no effect.
       # Not sure if there's a point to juggling @cache_execute if we're just gonna freeze always.
+      if tiebreaker_sort.present?
+        order(tiebreaker_sort)
+      end
+
       search_options.freeze
 
       ex = active_record_klass.__elasticsearch__.search(search_options).page(page_number).per(page_size)
