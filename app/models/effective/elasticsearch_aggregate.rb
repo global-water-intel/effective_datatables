@@ -105,11 +105,7 @@ module Effective
       when :raw
         @body[key] = options[:raw_aggs]
       else
-        if Rails.env.development?
-          binding.pry
-        else
-          raise NotImplementedError, "Don't know how to handle aggregate type: `#{type}`."
-        end
+        raise NotImplementedError, "Don't know how to handle aggregate type: `#{type}`."
       end
 
       @body
@@ -144,11 +140,7 @@ module Effective
       when :raw
         aggregations[key]
       else
-        if Rails.env.development?
-          binding.pry
-        else
-          raise NotImplementedError, "Don't know how to handle aggregate type: `#{type}`."
-        end
+        raise NotImplementedError, "Don't know how to handle aggregate type: `#{type}`."
       end
     end
 

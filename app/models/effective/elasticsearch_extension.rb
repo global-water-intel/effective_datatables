@@ -129,11 +129,7 @@ module Effective
               when nil
                 # TODO: hack to deal with spatial columns being borked in Rails 5
               else
-                if Rails.env.development?
-                  binding.pry
-                else
-                  raise NotImplementedError, "Don't know how to handle ActiveRecord column type: `#{type}`."
-                end
+                raise NotImplementedError, "Don't know how to handle ActiveRecord column type: `#{type}`."
               end
             end
 
@@ -247,11 +243,7 @@ module Effective
         when :uuid
           h[name] = send(name).to_s
         else
-          if Rails.env.development?
-            binding.pry
-          else
-            raise NotImplementedError, "Don't know how to handle ActiveRecord column type: `#{type}`."
-          end
+          raise NotImplementedError, "Don't know how to handle ActiveRecord column type: `#{type}`."
         end
       end
 
