@@ -21,7 +21,7 @@ module Effective
       return collection unless order_by_column.present?
 
       column_order = order_column(collection, order_by_column, @datatable.order_direction, order_by_column[:column])
-      raise 'order_column must return an Effective::ElasticsearchQueryBuilder object' unless column_order.kind_of?(Effective::ElasticsearchQueryBuilder)
+      raise 'order_column must truthy to .es_query_builder? method' unless column_order.try(:es_query_builder?)
       column_order
     end
 
@@ -41,7 +41,7 @@ module Effective
     def search(collection)
       search_terms.each do |name, search_term|
         column_search = search_column(collection, table_columns[name], search_term, table_columns[name][:column])
-        raise 'search_column must return an Effective::ElasticsearchQueryBuilder object' unless column_search.kind_of?(Effective::ElasticsearchQueryBuilder)
+        raise 'search_column must truthy to .es_query_builder? method' unless column_search.try(:es_query_builder?)
         collection = column_search
       end
       collection
