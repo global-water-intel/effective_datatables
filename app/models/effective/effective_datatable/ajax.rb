@@ -13,7 +13,9 @@ module Effective
         @display_table_columns ||= (
           {}.tap do |retval|
             params[:columns].each do |_, column|
+              next unless table_columns[column[:name]]
               retval[column[:name]] = table_columns[column[:name]] # Same order as ColReordernow
+
               retval[column[:name]][:visible] = (column[:visible] == 'true') # As per ColVis
             end
           end
