@@ -22,6 +22,7 @@ module Effective
 
       def elasticsearch_initialize(index_name_override = nil)
         index_name make_index_name(self, index_name_override)
+        document_type base_class.name.underscore
         settings_options = {
           index: {
             number_of_shards: 1,
@@ -161,7 +162,7 @@ module Effective
         def inherited(subclass)
           super
 
-          subclass.elasticsearch_initialize(subclass.name)
+          subclass.elasticsearch_initialize
         end
       end
 
