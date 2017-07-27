@@ -158,7 +158,9 @@ module Effective
         end
 
         def inherited(subclass)
-          subclass.index_name make_index_name(subclass)
+          super
+
+          subclass.elasticsearch_initialize
         end
       end
 
