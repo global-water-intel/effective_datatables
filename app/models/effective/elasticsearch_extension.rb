@@ -8,8 +8,19 @@ module Effective
     end
 
     module ClassMethods
+      def make_index_name(klass)
+        [
+          Rails.application.class.parent.to_s.underscore,
+          '_',
+          klass.name.underscore.pluralize,
+          '_',
+          Rails.env,
+          Rails.configuration.elasticsearch_suffix
+        ].join.downcase
+      end
+
       def elasticsearch_initialize
-        index_name "#{Rails.application.class.parent.to_s.underscore}_#{table_name}_#{Rails.env}#{Rails.configuration.elasticsearch_suffix}".downcase
+        index_name make_index_name(self)
         settings_options = {
           index: {
             number_of_shards: 1,
@@ -66,8 +77,6 @@ module Effective
                 filter: %w(lowercase asciifolding),
                 char_filter: %w(html_strip)
               },
-
-
               whitespace_case_insensitive: {
                 type: :custom,
                 tokenizer: :standard,
@@ -146,6 +155,10 @@ module Effective
 
             klass.index_lambdas.each { |lmbda| instance_exec('', &lmbda) }
           end
+        end
+
+        def inherited(subclass)
+          subclass.index_name make_index_name(subclass)
         end
       end
 
