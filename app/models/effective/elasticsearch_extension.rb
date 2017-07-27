@@ -8,19 +8,20 @@ module Effective
     end
 
     module ClassMethods
-      def make_index_name(klass)
+      def make_index_name(klass, main_name = nil)
+        main_name ||= klass.table_name
         [
           Rails.application.class.parent.to_s.underscore,
           '_',
-          klass.name.underscore.pluralize,
+          main_name.underscore.pluralize,
           '_',
           Rails.env,
           Rails.configuration.elasticsearch_suffix
         ].join.downcase
       end
 
-      def elasticsearch_initialize
-        index_name make_index_name(self)
+      def elasticsearch_initialize(index_name_override = nil)
+        index_name make_index_name(self, index_name_override)
         settings_options = {
           index: {
             number_of_shards: 1,
@@ -160,7 +161,7 @@ module Effective
         def inherited(subclass)
           super
 
-          subclass.elasticsearch_initialize
+          subclass.elasticsearch_initialize(subclass.name)
         end
       end
 
