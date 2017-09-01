@@ -3,6 +3,7 @@ module Effective
     attr_accessor :type, :field, :options
 
     def initialize(type, field, options)
+      raise ArgumentError, 'type argument cannot be blank!' if type.blank?
       self.type = type
       self.field = field
       self.options = options.presence || {}
