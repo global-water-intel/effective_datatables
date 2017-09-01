@@ -166,6 +166,10 @@ module Effective
       [@arrayified, @total_entries]
     end
 
+    def raw_aggregations
+      aggregations
+    end
+
     private
 
     def aggregations
