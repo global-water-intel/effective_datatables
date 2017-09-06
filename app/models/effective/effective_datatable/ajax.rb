@@ -28,7 +28,9 @@ module Effective
 
       def order_name
         @order_name ||= begin
-          if params[:order] && params[:columns]
+          if params[:order] && params[:order]['0'][:name]
+            params[:order]['0'][:name]
+          elsif params[:order] && params[:columns]
             order_by_column_index = (params[:order]['0'][:column] rescue '0')
             (params[:columns][order_by_column_index] || {})[:name]
           elsif @default_order.present?
