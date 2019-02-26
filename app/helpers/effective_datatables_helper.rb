@@ -1,99 +1,110 @@
+# These are expected to be called by a developer.  They are part of the datatables DSL.
 module EffectiveDatatablesHelper
-  def render_datatable(datatable, opts = {}, &block)
-    datatable.view = self
 
-    locals = {:style => :full, :filterable => true, :sortable => true, :table_class => 'table-bordered table-striped'}
-    locals = locals.merge(opts) if opts.kind_of?(Hash)
-    locals[:table_class] = 'sorting-hidden ' + locals[:table_class].to_s if locals[:sortable] == false
+  def render_datatable(datatable, input_js: {}, buttons: true, charts: true, entries: true, filters: true, inline: false, pagination: true, search: true, simple: false, sort: true)
+    raise 'expected datatable to be present' unless datatable
+    raise 'expected input_js to be a Hash' unless input_js.kind_of?(Hash)
 
-    # Do we have to look at empty? behaviour
-    if (block_given? || opts.kind_of?(String) || (opts.kind_of?(Hash) && opts[:empty].present?)) && datatable.empty?
-      if block_given?
-        yield; nil
-      elsif opts.kind_of?(String)
-        opts
-      elsif opts.kind_of?(Hash) && opts[:empty].present?
-        opts[:empty]
+    if simple
+      buttons = charts = entries = filters = pagination = search = sort = false
+    end
+
+    datatable.attributes[:inline] = true if inline
+    datatable.attributes[:sortable] = false unless sort
+
+    datatable.view ||= self
+
+    unless EffectiveDatatables.authorized?(controller, :index, datatable.collection_class)
+      return content_tag(:p, "You are not authorized to view this datatable. (cannot :index, #{datatable.collection_class})")
+    end
+
+    charts = charts && datatable._charts.present?
+    filters = filters && (datatable._scopes.present? || datatable._filters.present?)
+
+    html_class = ['effective-datatable', datatable.html_class, ('hide-sort' unless sort), ('hide-search' unless search), ('hide-buttons' unless buttons)].compact.join(' ')
+
+    if datatable.reorder? && !buttons
+      buttons = true; input_js[:buttons] = false
+    end
+
+    # Build the datatables DOM option
+    input_js[:dom] ||= [
+      ("<'row'<'col-sm-12 dataTables_buttons'B>>" if buttons),
+      "<'row'<'col-sm-12'tr>>",
+      ("<'row'" if entries || pagination),
+      ("<'col-sm-6 dataTables_entries'il>" if entries),
+      ("<'col-sm-6'p>" if pagination),
+      (">" if entries || pagination)
+    ].compact.join
+
+    effective_datatable_params = {
+      id: datatable.to_param,
+      class: html_class,
+      data: {
+        'bulk-actions' => datatable_bulk_actions(datatable),
+        'columns' => datatable_columns(datatable),
+        'cookie' => datatable.cookie_key,
+        'display-length' => datatable.display_length,
+        'display-order' => datatable_display_order(datatable),
+        'display-records' => datatable.to_json[:recordsFiltered],
+        'display-start' => datatable.display_start,
+        'inline' => inline.to_s,
+        'options' => input_js.to_json,
+        'reset' => (datatable_reset(datatable) if search),
+        'reorder' => datatable_reorder(datatable),
+        'reorder-index' => (datatable.columns[:_reorder][:index] if datatable.reorder?).to_s,
+        'simple' => simple.to_s,
+        'spinner' => icon('spinner'), # effective_bootstrap
+        'source' => effective_datatables.datatable_path(datatable, {format: 'json'}),
+        'total-records' => datatable.to_json[:recordsTotal]
+      }
+    }
+
+    if (charts || filters)
+      output = ''.html_safe
+
+      if charts
+        datatable._charts.each { |name, _| output << render_datatable_chart(datatable, name) }
       end
+
+      if filters
+        output << render_datatable_filters(datatable)
+      end
+
+      output << render(partial: 'effective/datatables/datatable',
+        locals: { datatable: datatable, effective_datatable_params: effective_datatable_params }
+      )
+
+      output
     else
-      render :partial => 'effective/datatables/datatable', :locals => locals.merge(:datatable => datatable)
+      render(partial: 'effective/datatables/datatable',
+        locals: { datatable: datatable, effective_datatable_params: effective_datatable_params }
+      )
     end
   end
 
-  def render_simple_datatable(datatable, opts = {})
+  def render_inline_datatable(datatable)
+    render_datatable(datatable, inline: true)
+  end
+
+  def render_simple_datatable(datatable)
+    render_datatable(datatable, simple: true)
+  end
+
+  def inline_datatable?
+    params[:_datatable_id].present?
+  end
+
+  def inline_datatable
+    return nil unless inline_datatable?
+    return @_inline_datatable if @_inline_datatable
+
+    datatable = EffectiveDatatables.find(params[:_datatable_id])
     datatable.view = self
-    locals = {:style => :simple, :filterable => false, :sortable => false, :table_class => ''}.merge(opts)
-    locals[:table_class] = 'sorting-hidden ' + locals[:table_class].to_s if locals[:sortable] == false
 
-    render :partial => 'effective/datatables/datatable', :locals => locals.merge(:datatable => datatable)
-  end
+    EffectiveDatatables.authorize!(self, :index, datatable.collection_class)
 
-  def datatable_filter(datatable, filterable = true)
-    return false unless filterable
-
-    filters = datatable.table_columns.values.map { |options, _| options[:filter] || {:type => 'null'} }
-
-    # Process any Procs
-    filters.each do |filter|
-      if filter[:values].respond_to?(:call)
-        filter[:values] = filter[:values].call()
-
-        if filter[:values].kind_of?(ActiveRecord::Relation) || (filter[:values].kind_of?(Array) && filter[:values].first.kind_of?(ActiveRecord::Base))
-          filter[:values] = filter[:values].map { |obj| [obj.id, obj.to_s] }
-        end
-      end
-    end
-
-    filters.to_json()
-  end
-
-  def datatable_non_sortable(datatable, sortable = true)
-    [].tap do |nonsortable|
-      datatable.table_columns.values.each_with_index { |options, x| nonsortable << x if options[:sortable] == false || sortable == false }
-    end.to_json()
-  end
-
-  def datatable_non_visible(datatable)
-    [].tap do |nonvisible|
-      datatable.table_columns.values.each_with_index do |options, x|
-        visible = (options[:visible].respond_to?(:call) ? datatable.instance_exec(&options[:visible]) : options[:visible])
-        nonvisible << x if visible == false
-      end
-    end.to_json()
-  end
-
-  def datatable_default_order(datatable)
-    [
-      if datatable.default_order.present?
-        index = (datatable.table_columns.values.find { |options| options[:name] == datatable.default_order.keys.first.to_s }[:index] rescue nil)
-        [index, datatable.default_order.values.first] if index.present?
-      end || [0, 'asc']
-    ].to_json()
-  end
-
-  def datatable_widths(datatable)
-    datatable.table_columns.values.map { |options| {'sWidth' => options[:width]} if options[:width] }.to_json()
-  end
-
-  def datatable_column_classes(datatable)
-    [].tap do |classes|
-      datatable.table_columns.values.each_with_index do |options, x|
-        classes << {:className => options[:class], :targets => [x]} if options[:class].present?
-      end
-    end.to_json()
-  end
-
-  def datatables_admin_path?
-    @datatables_admin_path ||= (
-      path = request.path.to_s.downcase.chomp('/') + '/'
-      referer = request.referer.to_s.downcase.chomp('/') + '/'
-      (attributes[:admin_path] || referer.include?('/admin/') || path.include?('/admin/')) rescue false
-    )
-  end
-
-  # TODO: Improve on this
-  def datatables_active_admin_path?
-    attributes[:active_admin_path] rescue false
+    @_inline_datatable ||= datatable
   end
 
 end
