@@ -246,6 +246,59 @@ module Effective
       @active_record_collection ||= (collection.ancestors.include?(ActiveRecord::Base) rescue false)
     end
 
+    def initalize_table_columns(cols)
+      sql_table = (collection.table rescue nil)
+
+      # Here we identify all belongs_to associations and build up a Hash like:
+      # {:user => {:foreign_key => 'user_id', :klass => User}, :order => {:foreign_key => 'order_id', :klass => Effective::Order}}
+      belong_tos = (collection.ancestors.first.reflect_on_all_associations(:belongs_to) rescue []).inject(HashWithIndifferentAccess.new()) do |retval, bt|
+        unless bt.options[:polymorphic]
+          begin
+            klass = bt.klass || bt.foreign_type.gsub('_type', '').classify.constantize
+          rescue => e
+            klass = nil
+          end
+
+          retval[bt.name] = {:foreign_key => bt.foreign_key, :klass => klass} if bt.foreign_key.present? && klass.present?
+        end
+
+        retval
+      end
+
+      cols.each_with_index do |(name, _), index|
+        # If this is a belongs_to, add an :if clause specifying a collection scope if
+        if belong_tos.key?(name)
+          cols[name][:if] ||= Proc.new { attributes[belong_tos[name][:foreign_key]].blank? } # :if => Proc.new { attributes[:user_id].blank? }
+        end
+
+        sql_column = (collection.columns rescue []).find do |column|
+          column.name == name.to_s || (belong_tos.key?(name) && column.name == belong_tos[name][:foreign_key])
+        end
+
+        cols[name][:array_column] ||= false
+        cols[name][:array_index] = index # The index of this column in the collection, regardless of hidden table_columns
+        cols[name][:name] ||= name
+        cols[name][:label] ||= name.titleize
+        cols[name][:column] ||= (sql_table && sql_column) ? "`#{sql_table.name}`.`#{sql_column.name}`" : name
+
+        cols[name][:width] ||= nil
+        cols[name][:sortable] = true if cols[name][:sortable] == nil
+        cols[name][:type] ||= (belong_tos.key?(name) ? :belongs_to : (sql_column.try(:type).presence || :string))
+        cols[name][:class] = "col-#{cols[name][:type]} col-#{name} #{cols[name][:class]}".strip
+
+        if name == 'id' && collection.respond_to?(:deobfuscate)
+          cols[name][:sortable] = false
+          cols[name][:type] = :obfuscated_id
+        end
+
+        cols[name][:filter] = initialize_table_column_filter(cols[name][:filter], cols[name][:type], belong_tos[name])
+
+        if cols[name][:partial]
+          cols[name][:partial_local] ||= (sql_table.try(:name) || cols[name][:partial].split('/').last(2).first.presence || 'obj').singularize.to_sym
+        end
+      end
+    end
+
     def elasticsearch_collection?
       collection.class == ElasticsearchQueryBuilder rescue false
     end

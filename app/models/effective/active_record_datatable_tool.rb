@@ -64,100 +64,10 @@ module Effective
 
       case table_column[:type]
       when :string, :text
-        if sql_op != :where
-          collection.public_send(sql_op, "#{sql_column} = :term", term: term)
-        elsif ['null', 'nil', nil].include?(term)
-          collection.public_send(sql_op, "#{sql_column} = :term OR #{sql_column} IS NULL", term: '')
-        elsif table_column[:filter][:fuzzy]
-          collection.public_send(sql_op, "#{sql_column} #{ilike} :term", term: "%#{term}%")
+        if table_column[:filter][:type] == :select && table_column[:filter][:fuzzy] != true
+          collection.where("LOWER(#{column}) = LOWER(:term)", :term => term)
         else
-          collection.public_send(sql_op, "#{sql_column} = :term", term: term)
-        end
-      when :belongs_to_polymorphic
-        # our key will be something like Post_15, or Event_1
-        (type, id) = term.split('_')
-
-        if type.present? && id.present?
-          collection.public_send(sql_op, "#{sql_column} = :id AND #{sql_column.sub('_id', '_type')} = :type", id: id, type: type)
-        else
-          collection
-        end
-      when :has_many
-        reflection = collection.klass.reflect_on_association(table_column[:name].to_sym)
-        raise "unable to find #{collection.klass.name} :has_many :#{table_column[:name]} association" unless reflection
-
-        obj = reflection.build_association({})
-        klass = obj.class
-        polymorphic = reflection.options[:as].present?
-
-        inverse = reflection.inverse_of
-        inverse ||= klass.reflect_on_association(reflection.options[:as]) if polymorphic
-        inverse ||= klass.reflect_on_association(collection.table_name)
-        inverse ||= obj.class.reflect_on_association(collection.table_name.singularize)
-
-        raise "unable to find #{klass.name} has_many :#{collection.table_name} or belongs_to :#{collection.table_name.singularize} associations" unless inverse
-
-        ids = if [:select, :grouped_select].include?(table_column[:filter][:as])
-          # Treat the search term as one or more IDs
-          inverse_ids = term.split(',').map { |term| (term = term.to_i) == 0 ? nil : term }.compact
-          return collection unless inverse_ids.present?
-
-          if polymorphic
-            klass.where(id: inverse_ids).where(reflection.type => collection.klass.name).pluck(reflection.foreign_key)
-          else
-            klass.where(id: inverse_ids).joins(inverse.name).pluck(inverse.foreign_key)
-          end
-        else
-          # Treat the search term as a string.
-          klass_columns = if (sql_column == klass.table_name) # No custom column has been defined
-            klass.columns.map { |col| col.name if col.text? }.compact  # Search all database text? columns
-          else
-            [sql_column.gsub("#{klass.table_name}.", '')] # table_column :order_items, column: 'order_items.title'
-          end
-
-          if polymorphic
-            klass_columns -= [reflection.type]
-          end
-
-          conditions = klass_columns.map { |col_name| "#{klass.table_name}.#{col_name} #{ilike} :term" }
-
-          if polymorphic
-            klass.where(conditions.join(' OR '), term: "%#{term}%", num: term.to_i).where(reflection.type => collection.klass.name).pluck(reflection.foreign_key)
-          else
-            klass.where(conditions.join(' OR '), term: "%#{term}%", num: term.to_i).joins(inverse.name).pluck(inverse.foreign_key)
-          end
-        end
-
-        collection.public_send(sql_op, id: ids)
-
-      when :has_and_belongs_to_many
-        reflection = collection.klass.reflect_on_association(table_column[:name].to_sym)
-        raise "unable to find #{collection.klass.name} :has_and_belongs_to_many :#{table_column[:name]} association" unless reflection
-
-        obj = reflection.build_association({})
-        klass = obj.class
-
-        inverse = reflection.inverse_of || klass.reflect_on_association(collection.table_name) || obj.class.reflect_on_association(collection.table_name.singularize)
-        raise "unable to find #{klass.name} has_and_belongs_to_many :#{collection.table_name} or belongs_to :#{collection.table_name.singularize} associations" unless inverse
-
-        ids = if [:select, :grouped_select].include?(table_column[:filter][:as])
-          # Treat the search term as one or more IDs
-          inverse_ids = term.split(',').map { |term| (term = term.to_i) == 0 ? nil : term }.compact
-          return collection unless inverse_ids.present?
-
-          klass.where(id: inverse_ids).flat_map { |klass| (klass.send(inverse.name).pluck(:id) rescue []) }
-        else
-          # Treat the search term as a string.
-
-          klass_columns = if (sql_column == klass.table_name) # No custom column has been defined
-            klass.columns.map { |col| col.name if col.text? }.compact  # Search all database text? columns
-          else
-            [sql_column.gsub("#{klass.table_name}.", '')] # table_column :order_items, column: 'order_items.title'
-          end
-
-          conditions = klass_columns.map { |col_name| "#{klass.table_name}.#{col_name} #{ilike} :term" }
-
-          klass.where(conditions.join(' OR '), term: "%#{term}%", num: term.to_i).flat_map { |klass| (klass.send(inverse.name).pluck(:id) rescue []) }
+          build_conditions_for(term, column, collection)
         end
 
         collection.public_send(sql_op, id: ids)
@@ -219,7 +129,19 @@ module Effective
     end
 
     def paginate(collection)
-      collection.page(page).per(per_page)
+      collection.per_page_kaminari(page).per(per_page)
+    end
+
+    def build_conditions_for(terms, column, collection)
+      if terms.match(/\".*\"/)
+        splits = [terms.gsub('"', "%")]
+      else
+        splits = terms.split.map { |w| "%#{w}%" }
+      end
+
+      splits.reduce(collection) do |col, word|
+        col.where("LOWER(#{column}) LIKE LOWER(:term)", term: word)
+      end
     end
 
     protected

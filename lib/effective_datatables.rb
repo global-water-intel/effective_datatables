@@ -1,8 +1,11 @@
 # require 'haml-rails'
 require 'kaminari'
-require 'simple_form'
-require 'effective_datatables/engine'
-require 'effective_datatables/version'
+Kaminari.configure do |config|
+  config.page_method_name = :per_page_kaminari
+end
+
+require "effective_datatables/engine"
+require "effective_datatables/version"
 
 module EffectiveDatatables
   mattr_accessor :authorization_method

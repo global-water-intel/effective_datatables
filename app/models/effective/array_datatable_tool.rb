@@ -78,7 +78,7 @@ module Effective
     end
 
     def paginate(collection)
-      Kaminari.paginate_array(collection).page(page).per(per_page)
+      Kaminari.paginate_array(collection).per_page_kaminari(page).per(per_page)
     end
 
     private
