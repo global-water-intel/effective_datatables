@@ -19,6 +19,9 @@
     }
   }
 %>
+
+<%= render_datatable_scopes(datatable) %>
+
 <% if datatable.charts? %>
   <%= render partial: datatable.charts_partial, locals: { datatable: datatable } %>
 <% end %>
