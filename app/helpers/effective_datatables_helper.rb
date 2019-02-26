@@ -1,158 +1,110 @@
+# These are expected to be called by a developer.  They are part of the datatables DSL.
 module EffectiveDatatablesHelper
-  def render_datatable(datatable, input_js_options = nil)
-    return unless datatable.present?
-    datatable.view ||= self
 
-    render partial: 'effective/datatables/datatable',
-      locals: { datatable: datatable, input_js_options: input_js_options.try(:to_json) }
-  end
+  def render_datatable(datatable, input_js: {}, buttons: true, charts: true, entries: true, filters: true, inline: false, pagination: true, search: true, simple: false, sort: true)
+    raise 'expected datatable to be present' unless datatable
+    raise 'expected input_js to be a Hash' unless input_js.kind_of?(Hash)
 
-  def render_datatable_scopes(datatable)
-    return unless datatable.scopes.present?
-    datatable.view ||= self
-
-    render partial: 'effective/datatables/scopes', locals: { datatable: datatable }
-  end
-
-  def render_datatable_charts(datatable)
-    return unless datatable.charts.present?
-    datatable.view ||= self
-
-    datatable.charts.map { |name, _| render_datatable_chart(datatable, name) }.join.html_safe
-  end
-
-  def render_datatable_chart(datatable, name)
-    return unless datatable.charts.present?
-    return unless datatable.charts[name].present?
-    datatable.view ||= self
-
-    unless @effective_datatables_chart_javascript_rendered
-      concat javascript_include_tag('https://www.google.com/jsapi')
-      concat javascript_tag("if(google && google.visualization === undefined) { google.load('visualization', '1', {packages:#{EffectiveDatatables.google_chart_packages}}); }")
-
-      @effective_datatables_chart_javascript_rendered = true
+    if simple
+      buttons = charts = entries = filters = pagination = search = sort = false
     end
 
-    options = datatable.charts[name]
-    chart = datatable.to_json[:charts][name]
+    datatable.attributes[:inline] = true if inline
+    datatable.attributes[:sortable] = false unless sort
 
-    render partial: (options[:partial] || 'effective/datatables/chart'),
-      locals: { datatable: datatable, chart: chart }
-  end
-
-  def render_simple_datatable(datatable, input_js_options = nil)
-    return unless datatable.present?
     datatable.view ||= self
-    datatable.simple = true
 
-    render partial: 'effective/datatables/datatable',
-      locals: {datatable: datatable, input_js_options: input_js_options.try(:to_json) }
-  end
+    unless EffectiveDatatables.authorized?(controller, :index, datatable.collection_class)
+      return content_tag(:p, "You are not authorized to view this datatable. (cannot :index, #{datatable.collection_class})")
+    end
 
-  def datatable_default_order(datatable)
-    [datatable.order_index, datatable.order_direction.downcase].to_json()
-  end
+    charts = charts && datatable._charts.present?
+    filters = filters && (datatable._scopes.present? || datatable._filters.present?)
 
-  # https://datatables.net/reference/option/columns
-  def datatable_columns(datatable)
-    form = nil
-    simple_form_for(:datatable_filter, url: '#', html: {id: "#{datatable.to_param}-form"}) { |f| form = f }
+    html_class = ['effective-datatable', datatable.html_class, ('hide-sort' unless sort), ('hide-search' unless search), ('hide-buttons' unless buttons)].compact.join(' ')
 
-    datatable
-      .display_or_default_table_columns
-      .map do |name, options|
-      {
-        name: options[:name],
-        title: content_tag(:span, options[:label], class: 'filter-label'),
-        className: options[:class],
-        width: options[:width],
-        responsivePriority: (options[:responsivePriority] || 10000),  # 10,000 is datatables default
-        sortable: (options[:sortable] && !datatable.simple?),
-        visible: (options[:visible].respond_to?(:call) ? datatable.instance_exec(&options[:visible]) : options[:visible]),
-        filterHtml: (datatable_header_filter(form, name, datatable.search_terms[name], options) unless datatable.simple?),
-        filterSelectedValue: options[:filter][:selected]
+    if datatable.reorder? && !buttons
+      buttons = true; input_js[:buttons] = false
+    end
+
+    # Build the datatables DOM option
+    input_js[:dom] ||= [
+      ("<'row'<'col-sm-12 dataTables_buttons'B>>" if buttons),
+      "<'row'<'col-sm-12'tr>>",
+      ("<'row'" if entries || pagination),
+      ("<'col-sm-6 dataTables_entries'il>" if entries),
+      ("<'col-sm-6'p>" if pagination),
+      (">" if entries || pagination)
+    ].compact.join
+
+    effective_datatable_params = {
+      id: datatable.to_param,
+      class: html_class,
+      data: {
+        'bulk-actions' => datatable_bulk_actions(datatable),
+        'columns' => datatable_columns(datatable),
+        'cookie' => datatable.cookie_key,
+        'display-length' => datatable.display_length,
+        'display-order' => datatable_display_order(datatable),
+        'display-records' => datatable.to_json[:recordsFiltered],
+        'display-start' => datatable.display_start,
+        'inline' => inline.to_s,
+        'options' => input_js.to_json,
+        'reset' => (datatable_reset(datatable) if search),
+        'reorder' => datatable_reorder(datatable),
+        'reorder-index' => (datatable.columns[:_reorder][:index] if datatable.reorder?).to_s,
+        'simple' => simple.to_s,
+        'spinner' => icon('spinner'), # effective_bootstrap
+        'source' => effective_datatables.datatable_path(datatable, {format: 'json'}),
+        'total-records' => datatable.to_json[:recordsTotal]
       }
-    end.to_json
-  end
+    }
 
-  def datatable_bulk_actions(datatable)
-    bulk_actions_column = datatable.table_columns.find { |_, options| options[:bulk_actions_column] }.try(:second)
-    return false unless bulk_actions_column
+    if (charts || filters)
+      output = ''.html_safe
 
-    {
-      dropdownHtml: render(
-        partial: bulk_actions_column[:dropdown_partial],
-        locals: { datatable: datatable, dropdown_block: bulk_actions_column[:dropdown_block] }.merge(bulk_actions_column[:partial_locals])
+      if charts
+        datatable._charts.each { |name, _| output << render_datatable_chart(datatable, name) }
+      end
+
+      if filters
+        output << render_datatable_filters(datatable)
+      end
+
+      output << render(partial: 'effective/datatables/datatable',
+        locals: { datatable: datatable, effective_datatable_params: effective_datatable_params }
       )
-    }.to_json()
-  end
 
-  def datatable_header_filter(form, name, value, opts)
-    return render(partial: opts[:header_partial], locals: {form: form, name: (opts[:label] || name), column: opts}) if opts[:header_partial].present?
-
-    include_blank = opts[:filter].key?(:include_blank) ? opts[:filter][:include_blank] : (opts[:label] || name.titleize)
-    placeholder = opts[:filter].key?(:placeholder) ? opts[:filter][:placeholder] : (opts[:label] || name.titleize)
-
-    case opts[:filter][:as]
-    when :string, :text, :number
-      form.input name, label: false, required: false, value: value,
-        as: :string,
-        placeholder: placeholder,
-        input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} }
-    when :date
-      form.input name, label: false, required: false, value: value,
-        as: (ActionView::Helpers::FormBuilder.instance_methods.include?(:effective_date_picker) ? :effective_date_picker : :string),
-        placeholder: placeholder,
-        input_group: false,
-        input_html: { name: nil, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
-        input_js: { useStrict: true, keepInvalid: true }
-    when :datetime
-      form.input name, label: false, required: false, value: value,
-        as: (ActionView::Helpers::FormBuilder.instance_methods.include?(:effective_date_time_picker) ? :effective_date_time_picker : :string),
-        placeholder: placeholder,
-        input_group: false,
-        input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
-        input_js: { useStrict: true, keepInvalid: true } # Keep invalid format like "2015-11" so we can still filter by year, month or day
-    when :select, :boolean
-      form.input name, label: false, required: false, value: value,
-        as: (ActionView::Helpers::FormBuilder.instance_methods.include?(:effective_select) ? :effective_select : :select),
-        collection: opts[:filter][:collection],
-        selected: value, # TODO: replacing opts[:filter][:selected] this is naughty but I'm not sure how to getthe select filter preloaded when using save_state
-        multiple: opts[:filter][:multiple] == true,
-        include_blank: include_blank,
-        input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
-        input_js: { placeholder: placeholder }
-    when :grouped_select
-      form.input name, label: false, required: false, value: value,
-        as: (ActionView::Helpers::FormBuilder.instance_methods.include?(:effective_select) ? :effective_select : :grouped_select),
-        collection: opts[:filter][:collection],
-        selected: opts[:filter][:selected],
-        multiple: opts[:filter][:multiple] == true,
-        include_blank: include_blank,
-        grouped: true,
-        polymorphic: opts[:filter][:polymorphic] == true,
-        group_label_method: opts[:filter][:group_label_method] || :first,
-        group_method: opts[:filter][:group_method] || :last,
-        input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
-        input_js: { placeholder: placeholder }
-    when :bulk_actions_column
-      form.input name, label: false, required: false, value: nil,
-        as: :boolean,
-        input_html: { name: nil, value: nil, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index], 'role' => 'bulk-actions-all'} }
+      output
+    else
+      render(partial: 'effective/datatables/datatable',
+        locals: { datatable: datatable, effective_datatable_params: effective_datatable_params }
+      )
     end
   end
 
-  def datatables_admin_path?
-    @datatables_admin_path ||= (
-      path = request.path.to_s.downcase.chomp('/') + '/'
-      referer = request.referer.to_s.downcase.chomp('/') + '/'
-      (attributes[:admin_path] || referer.include?('/admin/') || path.include?('/admin/')) rescue false
-    )
+  def render_inline_datatable(datatable)
+    render_datatable(datatable, inline: true)
   end
 
-  # TODO: Improve on this
-  def datatables_active_admin_path?
-    attributes[:active_admin_path] rescue false
+  def render_simple_datatable(datatable)
+    render_datatable(datatable, simple: true)
+  end
+
+  def inline_datatable?
+    params[:_datatable_id].present?
+  end
+
+  def inline_datatable
+    return nil unless inline_datatable?
+    return @_inline_datatable if @_inline_datatable
+
+    datatable = EffectiveDatatables.find(params[:_datatable_id])
+    datatable.view = self
+
+    EffectiveDatatables.authorize!(self, :index, datatable.collection_class)
+
+    @_inline_datatable ||= datatable
   end
 
 end

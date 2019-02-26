@@ -4,49 +4,70 @@ module Effective
 
     # This will respond to both a GET and a POST
     def show
-      attributes = (params[:attributes].presence || {}).merge(referer: request.referer)
-      scopes = (params[:scopes].presence || {})
+      begin
+        @datatable = EffectiveDatatables.find(params[:id])
+        @datatable.view = view_context
 
-      h = attributes.merge(scopes).merge(view: view_context).to_hash
-      @datatable = find_datatable(params[:id]).try(:new, h)
-      @datatable.view = view_context if !@datatable.nil?
+        EffectiveDatatables.authorize!(self, :index, @datatable.collection_class)
 
-      EffectiveDatatables.authorized?(self, :index, @datatable.try(:collection_class) || @datatable.try(:class))
+        render json: @datatable.to_json
+      rescue => e
+        EffectiveDatatables.authorized?(self, :index, @datatable.try(:collection_class))
+        render json: error_json(e)
 
-      respond_to do |format|
-        format.html
-        format.json {
-          if defined?(current_account) && current_account.respond_to?(:record) && current_account.record.respond_to?(:datatable_options)
-            current_account.record.datatable_options = params if attributes[:save_state]
+        ExceptionNotifier.notify_exception(e) if defined?(ExceptionNotifier)
+        raise e if Rails.env.development?
+      end
+    end
+
+    def reorder
+      begin
+        @datatable = EffectiveDatatables.find(params[:id])
+        @datatable.view = view_context
+
+        EffectiveDatatables.authorize!(self, :index, @datatable.collection_class)
+
+        @resource = @datatable.collection.find(params[:reorder][:id])
+
+        EffectiveDatatables.authorize!(self, :update, @resource)
+
+        attribute = @datatable.columns[:_reorder][:reorder]
+        old_index = params[:reorder][:old].to_i
+        new_index = params[:reorder][:new].to_i
+
+        @resource.class.transaction do
+          if new_index > old_index
+            @datatable.collection.where("#{attribute} > ? AND #{attribute} <= ?", old_index, new_index).update_all("#{attribute} = #{attribute} - 1")
+            @resource.update_column(attribute, new_index)
           end
-          if Rails.env.production?
-            render :json => (@datatable.to_json rescue error_json)
-          else
-            render :json => @datatable.to_json
+
+          if old_index > new_index
+            @datatable.collection.where("#{attribute} >= ? AND #{attribute} < ?", new_index, old_index).update_all("#{attribute} = #{attribute} + 1")
+            @resource.update_column(attribute, new_index)
           end
-        }
+        end
+
+        render status: :ok, body: :ok
+      rescue Effective::AccessDenied => e
+        render(status: :unauthorized, body: 'Access Denied')
+      rescue => e
+        render(status: :error, body: 'Unexpected Error')
       end
 
     end
 
     private
 
-    def find_datatable(id)
-      id_plural = id.pluralize == id && id.singularize != id
-      klass = "effective/datatables/#{id}".classify
-
-      (id_plural ? klass.pluralize : klass).safe_constantize
-    end
-
-    def error_json
+    def error_json(e)
       {
-        :draw => params[:draw].to_i,
-        :data => [],
-        :recordsTotal => 0,
-        :recordsFiltered => 0,
-        :aggregates => [],
-        :charts => {}
-      }.to_json
+        data: [],
+        draw: params[:draw].to_i,
+        effective_datatables_error: (e.message.presence unless e.class.name.include?('ActiveRecord::')) || 'unexpected operation',
+        recordsTotal: 0,
+        recordsFiltered: 0,
+        aggregates: [],
+        charts: {}
+      }
     end
 
   end

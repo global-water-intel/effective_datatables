@@ -45,6 +45,6 @@
     onChange: function(element) { }
   }
 
-  $.fn.delayedChange.oldVal = '';
+  $.fn.delayedChange.oldVal = 'NO_DELAYED_CHANGE_VALUE';
 
 })(jQuery);

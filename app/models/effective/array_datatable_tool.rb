@@ -3,53 +3,27 @@ module Effective
   class ArrayDatatableTool
     attr_accessor :table_columns
 
-    delegate :page, :per_page, :search_column, :order_column, :display_table_columns, :convert_to_column_type, :to => :@datatable
+    delegate :order_column_index, :order_direction, :page, :per_page, :search_column, :to => :@datatable
 
     def initialize(datatable, table_columns)
       @datatable = datatable
       @table_columns = table_columns
     end
 
+    def order_column
+      @order_column ||= table_columns.find { |_, values| values[:index] == order_column_index }.try(:second) # This pulls out the values
+    end
+
     def search_terms
       @search_terms ||= @datatable.search_terms.select { |name, search_term| table_columns.key?(name) }
     end
 
-    def order_by_column
-      @order_by_column ||= table_columns[@datatable.order_name]
-    end
-
     def order(collection)
-      return collection unless order_by_column.present?
-
-      column_order = order_column(collection, order_by_column, @datatable.order_direction, display_index(order_by_column))
-      raise 'order_column must return an Array' unless column_order.kind_of?(Array)
-      column_order
-    end
-
-    def order_column_with_defaults(collection, table_column, direction, index)
-      if direction == :asc
-        collection.sort! do |x, y|
-          if (x[index] && y[index])
-            convert_to_column_type(table_column, x[index]) <=> convert_to_column_type(table_column, y[index])
-          elsif x[index]
-            -1
-          elsif y[index]
-            1
-          else
-            0
-          end
-        end
-      else
-        collection.sort! do |x, y|
-          if (x[index] && y[index])
-            convert_to_column_type(table_column, y[index]) <=> convert_to_column_type(table_column, x[index])
-          elsif x[index]
-            1
-          elsif y[index]
-            -1
-          else
-            0
-          end
+      if order_column.present?
+        if order_direction == 'ASC'
+          collection.sort! { |x, y| x[order_column[:index]] <=> y[order_column[:index]] }
+        else
+          collection.sort! { |x, y| y[order_column[:index]] <=> x[order_column[:index]] }
         end
       end
 
@@ -58,21 +32,23 @@ module Effective
 
     def search(collection)
       search_terms.each do |name, search_term|
-        column_search = search_column(collection, table_columns[name], search_term, display_index(table_columns[name]))
+        column_search = search_column(collection, table_columns[name], search_term)
         raise 'search_column must return an Array object' unless column_search.kind_of?(Array)
         collection = column_search
       end
       collection
     end
 
-    def search_column_with_defaults(collection, table_column, search_term, index)
-      search_term = search_term.downcase if table_column[:filter][:fuzzy]
+    def search_column_with_defaults(collection, table_column, search_term)
+      search_term = search_term.downcase
 
       collection.select! do |row|
-        if table_column[:filter][:fuzzy]
-          convert_to_column_type(table_column, row[index]).to_s.downcase.include?(search_term)
+        value = row[table_column[:index]].to_s.downcase
+
+        if table_column[:filter][:type] == :select && table_column[:filter][:fuzzy] != true
+          value == search_term
         else
-          row[index] == search_term
+          value.include?(search_term)
         end
       end || collection
     end
@@ -80,13 +56,6 @@ module Effective
     def paginate(collection)
       Kaminari.paginate_array(collection).per_page_kaminari(page).per(per_page)
     end
-
-    private
-
-    def display_index(column)
-      display_table_columns.present? ? display_table_columns.keys.index(column[:name]) : column[:array_index]
-    end
-
   end
 end
 

@@ -1,18 +1,32 @@
 # Effective DataTables
 
-Uniquely powerful server-side searching, sorting and filtering of any ActiveRecord or Array collection as well as post-rendered content displayed as a frontend jQuery Datatable.
+Use a high level DSL and just one ruby file to create a [Datatables jQuery table](http://datatables.net/) for any ActiveRecord class or Array.
 
-Use a simple DSL in just one ruby file to implement all features
+Powerful server-side searching, sorting and filtering of ActiveRecord classes, with `belongs_to` and `has_many` relationships.
 
-Search raw database tables and ruby post-rendered results at the same time
+Does the right thing with searching sql columns as well as computed values from both ActiveRecord and Array collections.
 
-Packages the jQuery DataTables assets for use in a Rails 3.2.x & Rails 4.x application using Twitter Bootstrap 3
+Displays links to associated edit/show/destroy actions based on `current_user` authorized actions.
+
+Other features include aggregate (total/average) footer rows, bulk actions, show/hide columns, responsive collapsing columns and Google charts.
+
+This gem includes the jQuery DataTables assets.
+
 
 Works with postgres, mysql, sqlite3 and arrays.
 
-## Getting Started
+## effective_datatables 4.0
+
+This is the 4.0 series of effective_datatables.
+
+This requires Twitter Bootstrap 4 and Rails 5.1+
+
+Please check out [Effective Datatables 3.x](https://github.com/code-and-effect/effective_datatables/tree/bootstrap3) for more information using this gem with Bootstrap 3.
+
+# Getting Started
 
 ```ruby
+gem 'haml-rails'            # or try using gem 'hamlit-rails'
 gem 'effective_datatables'
 ```
 
@@ -30,6 +44,8 @@ rails generate effective_datatables:install
 
 The generator will install an initializer which describes all configuration options.
 
+Make sure you have [Twitter Bootstrap 4](https://github.com/twbs/bootstrap-rubygem) installed.
+
 Require the javascript on the asset pipeline by adding the following to your application.js:
 
 ```ruby
@@ -42,55 +58,46 @@ Require the stylesheet on the asset pipeline by adding the following to your app
 *= require effective_datatables
 ```
 
-## Usage
+# Quick Start
 
-We create a model, initialize it within our controller, then render it from a view
+All logic for the table exists in its own model file.  Once that's built, we initialize in the controller, render in the view.
 
-### The Model
+## The Model
 
-Start by creating a model in the `/app/models/effective/datatables/` directory.
+Start by creating a new datatable.
 
-Any `Effective::Datatable` models that exist in this directory will be automatically detected and 'just work'.
-
-Below is a very simple example file, which we will expand upon later.
-
-This model exists at `/app/models/effective/datatables/posts.rb`:
+This model exists at `/app/datatables/posts_datatable.rb`:
 
 ```ruby
-module Effective
-  module Datatables
-    class Posts < Effective::Datatable
-      datatable do
-        table_column :id
-        table_column :user      # if Post belongs_to :user
-        table_column :comments  # if Post has_many :comments
-        table_column :title
-        table_column :created_at
-        actions_column
-      end
+class PostsDatatable < Effective::Datatable
+  datatable do
+    col :created_at
+    col :title
+    col :user      # Post belongs_to :user
+    col :comments  # Post has_many :comments
 
-      def collection
-        Post.all
-      end
+    actions_col
+  end
 
-    end
+  collection do
+    Post.all
   end
 end
 ```
 
-### The Controller
+## The Controller
 
-We're going to display this DataTable on the posts#index action
+We're going to display this DataTable on the posts#index action.
 
 ```ruby
 class PostsController < ApplicationController
   def index
-    @datatable = Effective::Datatables::Posts.new
+    @datatable = PostsDatatable.new
   end
 end
 ```
 
-### The View
+## The View
 
 Here we just render the datatable:
 
@@ -99,435 +106,633 @@ Here we just render the datatable:
 <%= render_datatable(@datatable) %>
 ```
 
-## How It Works
+# Usage
 
-When the jQuery DataTable is first initialized on the front-end, it makes an AJAX request back to the server asking for data.
+Once your controller and view are set up to render a datatable, the model is the central point to configure all behaviour.
 
-The effective_datatables gem intercepts this request and returns the appropriate results.
+Here is an advanced example:
 
-Whenever a search, sort, filter or pagination is initiated on the front end, that request is interpretted by the server and the appropriate results returned.
+## The Model
 
-Due to the unique search/filter ability of this gem, a mix of raw database tables and processed results may be worked with at the same time.
-
-
-### Effective::Datatable Model & DSL
-
-Once your controller and view are set up to render a Datatable, the model is the central point to configure all behaviour.
-
-This single model file contains just 1 required method and responds to only 3 DSL commands.
-
-Each `Effective::Datatable` model must be defined in the `/app/models/effective/datatables/` directory.
-
-For example: `/app/models/effective/datatables/posts.rb`:
+This model exists at `/app/datatables/posts_datatable.rb`:
 
 ```ruby
-module Effective
-  module Datatables
-    class Posts < Effective::Datatable
-      datatable do
-        default_order :created_at, :desc
-        default_entries 25
+class PostsDatatable < Effective::Datatable
 
-        table_column :id, :visible => false
+  # The collection block is the only required section in a datatable
+  # It has access to the attributes and filters Hashes, representing the current state
+  # It must return an ActiveRecord::Relation or an Array of Arrays
+  collection do
+    scope = Post.all.joins(:user).where(created_at: filters[:start_date]...filters[:end_date])
+    scope = scope.where(user_id: attributes[:user_id]) if attributes[:user_id]
+    scope
+  end
 
-        table_column :created_at, :width => '25%'
+  # Everything in the filters block ends up in a single form
+  # The form is submitted by datatables javascript as an AJAX post
+  filters do
+    # Scopes are rendered as a single radio button form field (works well with effective_bootstrap gem)
+    # The scopes only work when your collection is an ActiveRecord class, and they must exist on the model
+    # The current scope is automatically applied by effective_datatables to your collection
+    # You don't have to consider the current scope when writing your collection block
+    scope :all, default: true
+    scope :approved
+    scope :draft
+    scope :for_user, (attributes[:user_id] ? User.find(attributes[:user_id]) : current_user)
 
-        table_column :updated_at, :proc => Proc.new { |post| nicetime(post.updated_at) } # just a standard helper as defined in helpers/application_helper.rb
+    # Each filter has a name and a default value and the default can be nil
+    # Each filter is displayed on the front end form as a single field
+    # The filters are NOT automatically applied to your collection
+    # You are responsible for considering filters in your collection block
+    filter :start_date, Time.zone.now-3.months, required: true
+    filter :end_date, Time.zone.now.end_of_day
+  end
 
-        table_column :user
+  # These are displayed as a dropdown menu next to the datatables built-in buttons.
+  bulk_actions do
+    # bulk_action is just passthrough to link_to(), but the action of POST is forced
+    # POSTs to the given url with params[:ids], an Array of ids for all selected rows
+    # These actions are assumed to change the underlying collection
+    bulk_action 'Approve all', bulk_approve_posts_path, data: { confirm: 'Approve all selected posts?' }
+    bulk_action_divider
+    bulk_action 'Destroy all', bulk_destroy_posts_path, data: { confirm: 'Destroy all selected posts?' }
+  end
 
-        table_column :post_category_id, :filter => {:as => :select, :collection => Proc.new { PostCategory.all } } do |post|
-          post.post_category.name.titleize
-        end
-
-        array_column :comments do |post|
-          content_tag(:ul) do
-            post.comments.where(:archived => false).map do |comment|
-              content_tag(:li, comment.title)
-            end.join('').html_safe
-          end
-        end
-
-        table_column :title, :label => 'Post Title', :class => 'col-title'
-        actions_column
+  # Google Charts
+  # https://developers.google.com/chart/interactive/docs/quick_start
+  # effective_datatables does all the javascript boilerplate. Just return an Array of Arrays.
+  # Charts are updated whenever the current filters and search change
+  charts do
+    chart :posts_per_day, 'LineChart', label: 'Posts per Day', legend: false do |collection|
+      collection.group_by { |post| post.created_at.beginning_of_day }.map do |date, posts|
+        [date.strftime('%F'), posts.length]
       end
-
-      def collection
-        Post.where(:archived => false).includes(:post_category)
-      end
-
     end
   end
-end
-```
 
-### The collection
+  # Datatables
+  # https://datatables.net/
+  # Each column header has a form field controlled by the search: { as: :string } option
+  # The user's selected filters, search, sort, length, column visibility and pagination settings are saved between visits
+  # on a per-table basis and can be Reset with a button
+  datatable do
+    length 25  # 5, 10, 25, 50, 100, 500, :all
+    order :updated_at, :desc
 
-A required method `def collection` must be defined to return the base ActiveRecord collection.
+    # Renders a column of checkboxes to select items for any bulk_actions
+    bulk_actions_col
 
-It can be as simple or as complex as you'd like:
+    col :id, visible: false
+    col :updated_at, visible: false
 
-```ruby
-def collection
-  Posts.all
-end
-```
-
-or (complex example):
-
-```ruby
-def collection
-  collection = Effective::Order.unscoped.purchased
-    .joins(:user)
-    .joins(:order_items)
-    .group('users.email')
-    .group('orders.id')
-    .select('users.email AS email')
-    .select('orders.*')
-    .select("#{query_total} AS total")
-    .select("string_agg(order_items.title, '!!OI!!') AS order_items")
-
-  if attributes[:user_id].present?
-    collection.where(:user_id => attributes[:user_id])
-  else
-    collection
-  end
-end
-
-def query_total
-  "SUM((order_items.price * order_items.quantity) + (CASE order_items.tax_exempt WHEN true THEN 0 ELSE ((order_items.price * order_items.quantity) * order_items.tax_rate) END))"
-end
-```
-
-### Array Backed collection
-
-Don't want to use ActiveRecord? Not a problem.
-
-Define your collection as an Array of Arrays, declare only array_columns, and everything works as expected.
-
-```ruby
-module Effective
-  module Datatables
-    class ArrayBackedDataTable < Effective::Datatable
-      datatable do
-        array_column :id
-        array_column :first_name
-        array_column :last_name
-        array_column :email
-      end
-
-      def collection
-        [
-          [1, 'June', 'Huang', 'june@einstein.com'],
-          [2, 'Leo', 'Stubbs', 'leo@einstein.com'],
-          [3, 'Quincy', 'Pompey', 'quincy@einstein.com'],
-          [4, 'Annie', 'Wojcik', 'annie@einstein.com'],
-        ]
-      end
-
+    col :created_at, label: 'Created' do |post|
+      time_ago_in_words(post.created_at)
     end
-  end
-end
-```
 
-## table_column
+    # This is a belongs_to column
+    # effective_datatables will try to put in an edit or show link, depending on the current_user's authorization
+    # It will also initialize the search field with PostCategory.all
+    col :post_category, action: :edit
 
-This is the main DSL method that you will interact with.
-
-table_column defines a 1:1 mapping between a SQL database table column and a frontend jQuery Datatables table column.  It creates a column.
-
-table_column performs searching and sorting on the raw database records, before any results are rendered.
-
-Options may be passed to specify the display, search, sort and filter behaviour for that column.
-
-When the given name of the table_column matches an ActiveRecord attribute, the options are set intelligently based on the underlying datatype.
-
-```ruby
-# The name of the table column as per the Database
-# This column is detected as an Integer, therefore it is :type => :integer
-# Any SQL used to search this field will take the form of "id = ?"
-table_column :id
-
-# As per our 'complex' example above, using the .select('customers.stripe_customer_id AS stripe_customer_id') syntax to create a faux database table
-# This column is detected as a String, therefore it is :type => :string
-# Any SQL used to search this field will take the form of "customers.stripe_customer_id ILIKE %?%"
-table_column :stripe_customer_id, :column => 'customers.stripe_customer_id'
-
-# The name of the table column as per the Database
-# This column is detected as a DateTime, therefore it is :type => :datetime
-# Any SQL used to search this field will take the form of
-# "to_char(#{column} AT TIME ZONE 'GMT', 'YYYY-MM-DD HH24:MI') ILIKE '%?%'"
-table_column :created_at
-
-# If the name of the table column matches a belongs_to in our collection's main class
-# This column will be detected as a belongs_to and some predefined filters will be set up
-# So declaring the following
-table_column :user
-
-# Will have the same behaviour as declaring
-datatable do
-  if attributes[:user_id].blank?
-    table_column :user_id, :filter => {:as => :select, :collection => Proc.new { User.all.map { |user| [user.id, user.to_s] }.sort { |x, y| x[1] <=> y[1] } } } do |post|
-      post.user.to_s
+    if attributes[:user_id].nil?  # Show all users, otherwise this table is meant for one user only
+      col :user, search: User.authors.all
     end
+
+    col 'user.first_name'  # Using the joined syntax
+
+    if can?(:index, Comment)
+      col :comments
+    end
+
+    col :category, search: { collection: Post::CATEGORY } do |survey|
+      Post::CATEGORY.invert[post.category]
+    end
+
+    # This is a computed method, not an attribute on the post database table.
+    # The first block takes the object from the collection do ... end block and does some work on it.
+    # It computes some value. A val.
+    # The first block returns a Float/Integer.  All sorting/ordering is then performed on this number.
+    # The second block formats the number and returns a String
+    val :approval_rating do |post|
+      post.approvals.sum { |a| a.rating }
+    end.format do |rating|
+      number_to_percentage(rating, precision: 2)
+    end
+
+    # In a col there is only one block, the format block.
+    # A col takes the value as per the collection do ... end block and just formats it
+    # All sorting/ordering is performed as per the original value.
+    col :approved do |post|
+      if post.approved?
+        content_tag(:span, 'Approved', 'badge badge-approved')
+      else
+        content_tag(:span, 'Draft', 'badge badge-draft')
+      end
+    end
+
+    # Will add a Total row to the table's tfoot
+    # :average is also supported, or you can do a custom block
+    aggregate :total
+
+    # Uses effective_resources gem to discover the resource path and authorization actions
+    # Puts links to show/edit/destroy actions, if authorized to those actions.
+    # Use the actions_col block to add additional actions
+
+    actions_col
+
+    # actions_col(edit: false) do |post|
+    #   dropdown_link_to('Approve', approve_post_path(post) data: { method: :post, confirm: "Approve #{post}?"})
+    # end
   end
+
 end
 ```
 
-All table_columns are `visible: true`, `sortable: true` by default.
+## The Controller
 
-## array_column
+Any options used to initialize a datatable become the `attributes`.  Use these to configure datatables behavior.
 
-`array_column` accepts the same options as `table_column` and behaves identically on the frontend.
-
-The difference occurs with sorting and filtering:
-
-array_columns perform searching and sorting on the computed results after all columns have been rendered.
-
-With a `table_column`, the frontend sends some search terms to the server, the raw database table is searched & sorted using standard ActiveRecord .where() and .order(), the appropriate rows returned, and then each row is rendered as per the rendering options.
-
-With an `array_column`, the front end sends some search terms to the server, all rows are returned and rendered, and then the rendered output is searched & sorted.
-
-This allows the output of an `array_column` to be anything complex that cannot be easily computed from the database.
-
-When searching & sorting with a mix of table_columns and array_columns, all the table_columns are processed first so the most work is put on the database, the least on rails.
-
-If you're overriding the `search_column` or `order_column` behaviour of an `array_column`, keep in mind that all values will be strings.
-
-This has the side effect of ordering an `array_column` of numbers, as if they were strings.  To keep them ordered as numbers, call:
-
-```ruby
-array_column :price, type: :number do |product|
-  number_to_currency(product.price)
-end
-```
-
-The above code will output the price as a currency, but still sort the values as numbers rather than as strings.
-
-
-### General Options
-
-The following options control the general behaviour of the column:
-
-```ruby
-:column => 'users.id'     # Set this if you're doing something tricky with the database.  Used internally for .order() and .where() clauses
-:type => :string          # Derived from the ActiveRecord attribute default datatype.  Controls searching behaviour.  Valid options include :string, :text, :datetime, :date, :integer, :boolean, :year
-```
-
-### Display Options
-
-The following options control the display behaviour of the column:
-
-```ruby
-:label => 'Nice Label'    # Override the default column header label
-:sortable => true|false   # Allow sorting of this column.  Otherwise the up/down arrows on the frontend will be disabled.
-:visible => true|false    # Hide this column at startup.  Column visbility can be changed on the frontend.  By default, hidden column filter terms are ignored.
-:width => '100%'|'100px'  # Set the width of this column.  Can be set on one, all or some of the columns.  If using percentages, should never add upto more than 100%
-:class => 'col-example'   # Adds an html class to the column's TH and all TD elements.  Add more than one class with 'example col-example something'
-:responsivePriority => 0  # Set which columns collapse when the table is shrunk down.  10000 is the default value.
-```
-
-### Filtering Options
-
-Setting a filter will create an appropriate text/number/select input in the header row of the column.
-
-The following options control the filtering behaviour of the column:
-
-```ruby
-table_column :created_at, :filter => false    # Disable filtering on this column entirely
-table_column :created_at, :filter => {...}    # Enable filtering with these options
-
-:filter => {:as => :number}
-:filter => {:as => :text}
-
-:filter => {:as => :select, :collection => ['One', 'Two'], :selected => 'Two'}
-:filter => {:as => :select, :collection => [*2010..(Time.zone.now.year+6)]}
-:filter => {:as => :select, :collection => Proc.new { PostCategory.all } }
-:filter => {:as => :select, :collection => Proc.new { User.all.order(:email).map { |obj| [obj.id, obj.email] } } }
-
-:filter => {:as => :grouped_select, :collection => {'Active' => Events.active, 'Past' => Events.past }}
-:filter => {:as => :grouped_select, :collection => {'Active' => [['Event A', 1], ['Event B', 2]], 'Past' => [['Event C', 3], ['Event D', 4]]} }
-```
-
-Some additional, lesser used options include:
-
-```ruby
-:filter => {:fuzzy => true} # Will use an ILIKE/includes rather than = when filtering.  Use this for selects.
-:filter => {sql_operation => :having}  # Will use .having() instead of .where() to handle aggregate columns (autodetected)
-:filter => {include_blank: false}
-:filter => {placeholder: false}
-```
-
-### Rendering Options
-
-There are a few different ways to render each column's output.
-
-Any standard view helpers like `link_to` or `simple_format` and any custom helpers available to your views will be available.
-
-All of the following rendering options can be used interchangeably:
-
-Block format (really, this is your cleanest option):
-
-```ruby
-table_column :created_at do |post|
-  if post.created_at > (Time.zone.now-1.year)
-    link_to('this year', post_path(post))
-  else
-    link_to(post.created_at.strftime("%Y-%m-%d %H:%M:%S"), post_path(post))
-  end
-end
-```
-
-Proc format:
-
-```ruby
-table_column :created_at, :proc => Proc.new { |post| link_to(post.created_at, post_path(post)) }
-```
-
-Partial format:
-
-```ruby
-table_column :actions, :partial => '/posts/actions'  # render this partial for each row of the table
-```
-
-then in your `/app/views/posts/_actions.html.erb` file:
-
-```erb
-<p><%= link_to('View', post_path(post)) %></p>
-<p><%= link_to('Edit', edit_post_path(post)) %></p>
-```
-
-The local object name will either match the database table singular name `post`, the name of the partial `actions`, or `obj` unless overridden with:
-
-```ruby
-table_column :actions, :partial => '/posts/actions', :partial_local => 'the_post'
-```
-
-There are also a built in helper, `datatables_admin_path?` to considering if the current screen is in the `/admin` namespace:
-
-```ruby
-table_column :created_at do |post|
-  if datatables_admin_path?
-    link_to admin_posts_path(post)
-  else
-    link_to posts_path(post)
-  end
-end
-```
-
-The request object is available to the table_column, so you could just as easily call:
-
-```ruby
-request.referer.include?('/admin/')
-```
-
-### Column Header Rendering Options
-
-You can override the default rendering and define a partial to use for the header `<th>`:
-
-```ruby
-table_column :special, :header_partial => '/posts/special_header'
-```
-
-The following locals will be available in the header partial:
-
-```ruby
-form        # The SimpleForm FormBuilder instance
-name        # The name of your column
-column      # the table_column options
-filterable  # whether the dataTable is filterable
-```
-
-## actions_column
-
-Creates a column with links to this resource's `show`, `edit` and `destroy` actions.
-
-Sets `responsivePriority: 0` so the column is last to collapse when the table is shrunk down.
-
-Override the default actions by passing your own partial:
-
-```ruby
-actions_column partial: 'admin/posts/actions'
-```
-
-### Showing action buttons
-
-The show/edit/destroy action buttons can be configured to always show, always hide, or to consider the current_user's permission level.
-
-To always show / hide:
-
-```ruby
-actions_column show: false, edit: true, destroy: true, unarchive: true
-```
-
-To authorize based on the current_user and the `config.authorization_method`:
-
-```ruby
-actions_column show: :authorize
-```
-
-The above will call the effective_datatables `config.authorization_method` just once to see if the current_user has permission to show/edit/destroy the collection class.
-
-The action button will be displayed if `EffectiveDatatables.authorized?(controller, :edit, Post)` returns true.
-
-To call authorize on each individual resource:
-
-```ruby
-actions_column show: :authorize_each
-```
-
-Or via a Proc:
-
-```ruby
-actions_column show: Proc.new { |resource| can?(:show, resource.parent) }
-```
-
-See the `config/initializers/effective_datatable.rb` file for more information.
-
-## bulk_actions_column
-
-Creates a column of checkboxes to select one, some, or all rows and adds a bulk actions dropdown button.
-
-When one or more checkboxes are checked, the bulk actions dropdown is enabled and any defined `bulk_action`s will be available to click.
-
-Clicking a bulk action makes an AJAX POST request with the parameters `ids: [1, 2, 3]` as per the selected rows.
-
-By default, the method used to determine each row's checkbox value is `to_param`. To call a different method use `bulk_actions_column(resource_method: :slug) do ... end`.
-
-This feature has been built with an ActiveRecord collection in mind. To work with an Array backed collection try `resource_method: :first` or similar.
-
-After the AJAX request is done, the datatable will be redrawn so any changes made to the collection will be displayed immediately.
-
-You can define any number of `bulk_action`s, and separate them with one or more `bulk_action_divider`s.
-
-The `bulk_action` method is just an alias for `link_to`, so all the same options will work.
-
-```ruby
-bulk_actions_column do
-  bulk_action 'Approve all', bulk_approve_posts_path, data: { method: :post, confirm: 'Approve all selected posts?' }
-  bulk_action_divider
-  bulk_action 'Send emails', bulk_email_posts_path, data : { method: :post, confirm: 'Really send emails?' }
-end
-```
-
-You still need to write your own controller action to process the bulk action.  Something like:
+In the above example, when `attributes[:user_id]` is present, the table displays information for just that user.
 
 ```ruby
 class PostsController < ApplicationController
-  def bulk_approve
-    @posts = Post.where(id: params[:ids])
+  def index
+    @datatable = PostsDatatable.new(user_id: current_user.id)
+  end
+end
+```
 
-    # You should probably write this inside a transaction.  This is just an example.
-    begin
-      @posts.each { |post| post.approve! }
-    rescue => e
-      render json: { status: 500, message: 'An error occured while approving a post.' }
+## The View
+
+Render the datatable with its filters and charts, all together:
+
+```
+<h1>All Posts</h1>
+<%= render_datatable(@datatable) %>
+```
+
+or, the datatable, filter and charts may be rendered individually:
+
+```
+<h1>All Posts</h1>
+<p>
+  <%= render_datatable_filters(@datatable) %>
+</p>
+
+<p>
+  <%= render_datatable_charts(@datatable) %>
+</p>
+
+<p>
+<%= render_datatable(@datatable, charts: false, filters: false) %>
+</p>
+```
+
+or, to render a simple table, (without filters, charts, pagination, sorting, searching, export buttons, per page, or default visibility):
+
+```
+<%= render_datatable(@datatable, simple: true) %>
+```
+
+# DSL
+
+The effective_datatables DSL is made up of 5 sections: `collection`, `datatable`, `filters` `bulk_actions`, `charts`
+
+As well, a datatable can be initialized with `attributes`.
+
+## attributes
+
+When initialized with a Hash, that hash is available throughout the entire datatable as `attributes`.
+
+You can call the attributes from within the datatable as `attributes` or within a partial/view as `@datatable.attributes`.
+
+These attributes are serialized and stored in an encrypted cookie. Objects won't work. Keep it simple.
+
+Attributes cannot be changed by search, filter, or state in any way. They're guaranteed to be the same as when first initialized.
+
+```ruby
+class PostsController < ApplicationController
+  def index
+    @datatable = PostsDatatable.new(user_id: current_user.id, admin: true)
+  end
+end
+```
+
+Use attributes to restrict the collection scope, exclude columns or otherwise tweak the table.
+
+An example of using `attributes[:user_id]` to make a user specific posts table is above.
+
+Here we do something similar with `attributes[:admin]`:
+
+```ruby
+class PostsDatatable < Effective::Datatable
+  collection do
+    attributes[:admin] ? Post.all : Post.where(draft: false)
+  end
+
+  datatable do
+    col :title
+
+    if attributes[:admin]
+      col :user
+    end
+
+    col :post_category
+    col :comments
+  end
+end
+```
+
+## collection
+
+The `collection do ... end` block must return an ActiveRecord relation or an Array of Arrays.
+
+```ruby
+collection do
+  Post.all
+end
+```
+
+or
+
+```ruby
+collection do
+  scope = Post.includes(:user).where(created_at: filters[:start_date]...filters[:end_date])
+  scope = scope.where(user_id: attributes[:user_id]) if attributes[:user_id]
+  scope
+end
+```
+
+or
+
+```ruby
+collection do
+  [
+    ['June', 'Huang', 'june@einstein.com'],
+    ['Leo', 'Stubbs', 'leo@einstein.com'],
+    ['Quincy', 'Pompey', 'quincy@einstein.com'],
+    ['Annie', 'Wojcik', 'annie@einstein.com'],
+  ]
+end
+```
+
+or
+
+```ruby
+collection do
+  time_entries = TimeEntry.where(date: filter[:start_date].beginning_of_year...filter[:end_date].end_of_year)
+    .group_by { |time_entry| "#{time_entry.client_id}_#{time_entry.created_at.strftime('%b').downcase}" }
+
+  Client.all.map do |client|
+    [client] + [:jan, :feb, :mar, :apr, :may, :jun, :jul, :aug, :sep, :oct, :nov, :dec].map do |month|
+      entries = time_entries["#{client.id}_#{month}"] || []
+
+      calc = TimeEntryCalculator.new(entries)
+
+      [calc.duration, calc.bill_duration, calc.overtime, calc.revenue, calc.cost, calc.net]
     end
   end
 end
 ```
 
-and in your `routes.rb`:
+The collection block is responsible for applying any `attribute` and `filters` logic.
+
+When an ActiveRecord collection, the `current_scope`, will be applied automatically by effective_datatables.
+
+All searching and ordering is also done by effective_datatables.
+
+Your collection method should not contain a `.order()`, or implement search in any way.
+
+Sometimes it's handy to call `.reorder(nil)` on a scope.
+
+## datatable
+
+The `datatable do ... end` block configures a table of data.
+
+Initialize the datatable in your controller or view, `@datatable = PostsDatatable.new(self)`, and render it in your view `<%= render_datatable(@datatable) %>`
+
+### col
+
+This is the main DSL method that you will interact with.
+
+`col` defines a 1:1 mapping between the underlying SQL database table column or Array index to a frontend jQuery Datatables table column. It creates a column.
+
+Each column's search and sorting is performed on its underlying value, as per the collection.
+
+It accepts one optional block used to format the value after any search or sorting is done.
+
+The following options are available:
+
+```ruby
+action: :show|:edit|false  # :resource and relation columns only. generate links to this action. edit -> show by default
+as: :string|:integer|etc   # Sets the type of column initializing defaults for search, sort and format
+col_class: 'col-green'     # Sets the html class to use on this column's td and th
+label: 'My label'          # The label for this column
+partial: 'posts/category'  # Render this column with a partial. The local will be named resource
+partial_as: 'category'     # The name of the object's local variable, otherwise resource
+responsive: 10000          # Controls how columns collapse https://datatables.net/reference/option/columns.responsivePriority
+
+# Configure the search behavior. Autodetects by default.
+search: false
+search: :string
+search: { as: :string, fuzzy: true }
+search: User.all
+search: { as: :select, collection: User.all, multiple: true, include_null: 'All Users' }
+search: { collection: { 'All Books' => Book.all, 'All Shirts' => Shirt.all}, polymorphic: true }
+
+sort: true|false           # Should this column be orderable. true by default
+sql_column: 'posts.rating' # The sql column to search/sort on. Only needed when doing custom selects or tricky joins.
+visible: true|false        # Show/Hide this column by default
+```
+
+The `:as` setting determines a column's search, sort and format behaviour.
+
+It is auto-detected from an ActiveRecord collection's SQL datatype, and set to `:string` for any Array-based collections.
+
+Valid options for `:as` are as follows:
+
+`:boolean`, `:currency`, `:datetime`, `:date`, `:decimal`, `:duration`, `:email`, `:float`, `:integer`, `:percent`, `:price`, `:resource`, `:string`, `:text`
+
+These settings are loosely based on the regular datatypes, with some custom effective types thrown in:
+
+- `:currency` expects the underlying datatype to be a Float.
+- `:duration` expects the underlying datatype to be an Integer representing the number of minutes. 120 == 2 hours
+- `:email` expects the underlying datatype to be a String
+- `:percent` expects the underlying datatype to be an Integer * 1000. 50000 == 50%. 50125 == 50.125%.
+- `:price` expects the underlying datatype to be an Integer representing the number of cents. 5000 == $50.00
+- `:resource` can be used for an Array based collection which includes an ActiveRecord object
+
+The column will be formatted as per its `as:` setting, unless a custom format block is present:
+
+```ruby
+col :approved do |post|
+  if post.approved?
+    content_tag(:span, 'Approved', 'badge badge-approved')
+  else
+    content_tag(:span, 'Draft', 'badge badge-draft')
+  end
+end
+```
+
+You can also set custom search and sort on a per-column basis. See Advanced Search and Sort below.
+
+If the column name matches a `belongs_to`, `has_many` or other association on your collection class, like `col :user`, the column will be created as a resource column.
+
+A resource column will try to link to the show/edit/destroy actions of its objects, based on permissions and routes. You can alter this behaviour with the `action:` variable.
+
+You can also use the joined syntax, `col 'user.email'` to create a column for just this one field.
+
+This feature is only working with `belongs_to` and you need to add the `.joins(:user)` to the collection do ... end block yourself.
+
+### val
+
+Shorthand for value, this command also creates a column on the datatable.
+
+It accepts all the same options as `col` with the additional requirement of a "compute" block.
+
+```ruby
+val :approval_rating do |post|
+  post.approvals.sum { |a| a.rating }
+end.format do |rating|
+  number_to_percentage(rating, precision: 2)
+end
+```
+
+So, `val` yields the object from the collection to the first/compute block, and stores the result.
+
+All searching and sorting for this column will be performed on this computed value.
+
+This is implemented as a full Array search/sort and is much slower for large datasets than a paginated SQL query
+
+The `.format do ... end` block can then be used to apply custom formatting.
+
+### bulk_actions_col
+
+Creates a column of checkboxes for use with the `bulk_actions` section.
+
+Each input checkbox has a value equal to its row `object.to_param` and gets submitted as an Array of ids, `params[:ids]`
+
+Use these checkboxes to select all / none / one or more rows for the `bulk_actions do ... end` section (below).
+
+You can only have one `bulk_actions_col` per datatable.
+
+### actions_col
+
+When working with an ActiveRecord based collection, this column will consider the `current_user`'s authorization, and generate links to edit, show and destroy actions for any collection class.
+
+The authorization method is configured via the `config/initializers/effective_datatables.rb` initializer file.
+
+There are just a few options:
+
+```ruby
+btn_class: 'btn-sm btn-outline-primary'
+show: true|false
+edit: true|false
+destroy: true|false
+visible: true|false
+actions_partial: :dropleft
+inline: true|false
+```
+
+Each object is checked individually for authorization.
+
+The arguments to `actions_col` are passed through to the `effective_resource` gem's [render_resource_actions](https://github.com/code-and-effect/effective_resources/blob/master/app/helpers/effective_resources_helper.rb#L57).
+
+It's all very complicated.
+
+If you just want to override this entire column with your own actions implementation, you can pass `actions_col partial: 'my_partial'` and roll your own.
+
+Otherwise, use the following block syntax to add additional actions. This helper comes from `effective_bootstrap` gem.
+
+```ruby
+actions_col do |post|
+  dropdown_link_to('Approve', approve_post_path(post) data: { method: :post, confirm: "Approve #{post}?"})
+end
+```
+
+Any `data-remote` actions will be hijacked and performed as inline ajax by datatables.
+
+If you'd like to opt-out of this behavior, use `actions_col(inline: false)` or add `data-inline: false` to your action link.
+
+### length
+
+Sets the default number of rows per page. Valid lengths are `5`, `10`, `25`, `50`, `100`, `250`, `500`, `:all`
+
+When not specified, effective_datatables uses the default as per the `config/initializers/effective_datatables.rb` or 25.
+
+```ruby
+length 100
+```
+
+### order
+
+Sets the default order of table rows. The first argument is the column, the second the direction.
+
+The column must exist as a `col` or `val` and the direction is either `:asc` or `:desc`.
+
+When not specified, effective_datatables will sort by the first defined column.
+
+```ruby
+order :created_at, :asc|:desc
+```
+
+### reorder
+
+Enables drag-and-drop row re-ordering.
+
+Only works with ActiveRecord collections.
+
+The underlying field must be an Integer, and it's assumed to be a sequential list of unique numbers.
+
+When a drag and drop is completed, a POST request is made to the datatables#reorder action that will update the indexes.
+
+Both zero and one based lists will work.
+
+```ruby
+reorder :position
+```
+
+Using `reorder` will sort the collection by this field and disable all other column sorting.
+
+### aggregate
+
+The `aggregate` command inserts a row in the table's `tfoot`.
+
+The only option available is `:label`.
+
+You can only have one aggregate per datatable. (Unfortunately, this is a limit of the jQuery Datatables)
+
+There is built in support for automatic `:total` and `:average` aggregates:
+
+```ruby
+aggregate :total|:average
+```
+
+or write your own:
+
+```ruby
+aggregate :average_as_percentage do |values, column|
+  if column[:name] == :first_name
+    'Average'
+  elsif values.present?
+    average = values.map { |value| value.presence || 0 }.sum / [values.length, 1].max
+    content_tag(:span, number_to_percentage(average, precision: 1))
+  end
+end
+```
+
+You can also override an individual columns aggregate calculation as follows:
+
+```ruby
+col :created_at, label: 'Created' do |post|
+  time_ago_in_words(post.created_at)
+end.aggregate { |values, column| distance_of_time_in_words(values.min, values.max) }
+```
+
+In the above example, `values` is an Array containing all row's values for one column at a time.
+
+## filters
+
+Creates a single form with fields for each `filter` and a single radio input field for all `scopes`.
+
+The form is submitted by an AJAX POST action, or, in some advanced circumstances (see Dynamic Columns below) as a regular POST or even GET.
+
+Initialize the datatable in your controller or view, `@datatable = PostsDatatable.new(self)`, and render its filters anywhere with `<%= render_datatable_filters(@datatable) %>`.
+
+### scope
+
+All defined scopes are rendered as a single radio button form field. Works great with the [effective_form_inputs](https://github.com/code-and-effect/effective_form_inputs) gem.
+
+Only supported for ActiveRecord based collections. They must exist as regular scopes on the model.
+
+The currently selected scope will be automatically applied. You shouldn't consider it in your collection block.
+
+```ruby
+filters do
+  scope :approved
+  scope :for_user, current_user
+end
+```
+
+Must match the scopes in your `app/models/post.rb`:
+
+```ruby
+class Post < ApplicationRecord | ActiveRecord::Base
+  scope :approved, -> { where(draft: false) }
+  scope :for_user, Proc.new { |user| where(user: user) }
+end
+```
+
+### filter
+
+Each filter has a name and a default/fallback value. If the form is submitted blank, the default values are used.
+
+effective_datatables looks at the default value, and tries to cast the incoming (String) value into that datatype.
+
+This ensures that calling `filters[:name]` always return a value. The default can be nil.
+
+You can override the parsing on a per-filter basis.
+
+Unlike `scope`s, the filters are NOT automatically applied to your collection. You are responsible for considering `filters` in your collection block.
+
+```ruby
+filters do
+  filter :start_date, Time.zone.now-3.months, required: true
+  filter :end_date, nil, parse: -> { |term| Time.zone.local(term).end_of_day }
+  filter :user, current_user, as: :select, collection: User.all
+  filter :year, 2018, as: :select, collection: [2018, 2017], label: false, include_blank: false
+  filter :year_group, '2018', as: :select, grouped: true, collection: { 'Years' => [['2017', 2017], ['2018', 2018]], 'Months' => [['January', 1], ['February', 2]] }
+end
+```
+
+and apply these to your `collection do ... end` block by calling `filters[:start_date]`:
+
+```ruby
+collection do
+  scope = Post.includes(:post_category, :user).where('created_at > ?', filters[:start_date])
+
+  if filters[:end_date].present?
+    scope = scope.where('created_at < ?', filters[:end_date])
+  end
+
+  scope
+end
+```
+
+The filter command has the following options:
+
+```ruby
+as: :select|:date|:boolean      # Passed to form
+label: 'My label'               # Label for this form field
+parse: -> { |term| term.to_i }  # Parse the incoming term (string) into whatever datatype
+required: true|false            # Passed to form
+```
+
+Any other option given will be yielded to SimpleForm as `input_html` options.
+
+## bulk_actions
+
+Creates a single dropdown menu with a link to each action, download or content.
+
+Along with this section, you must put a `bulk_actions_col` somewhere in your `datatable do ... end` section.
+
+### bulk_action
+
+Creates a link that becomes clickable when one or more checkbox/rows are selected as per the `bulk_actions_col` column.
+
+A controller action must be created to accept a POST with an array of selected ids, `params[:ids]`.
+
+This is a pass-through to `link_to` and accepts all the same options, except that the method `POST` is used by default.
+
+You can also specify `data-method: :get` to instead make a `GET` request with the selected ids and redirect the browser link a normal link.
+
+```ruby
+bulk_actions do
+  bulk_action 'Approve all', bulk_approve_posts_path, data: { confirm: 'Approve all selected posts?' }
+end
+```
+
+In your `routes` file:
 
 ```ruby
 resources :posts do
@@ -537,313 +742,338 @@ resources :posts do
 end
 ```
 
-## scopes
-
-When declaring a scope, a form field will automatically be placed above the datatable that can filter on the collection.
-
-The value of the scope, its default value, will be available for use anywehre in your datatable via the `attributes` hash.
+In your `PostsController`:
 
 ```ruby
-scopes do
-  scope :start_date, Time.zone.now-3.months, filter: { input_html: { class: 'datepicker' } }
-end
-```
+def bulk_approve
+  @posts = Post.where(id: params[:ids])
 
-(scopes is declared outside of the `datatable do ... end` block)
-
-and then in your collection, or any `table_column` block:
-
-```ruby
-def collection
-  Post.where('updated_at > ?', attributes[:start_date])
-end
-```
-
-As well, you need to change the controller where you define the datatable to be aware of the scope params.
-
-```ruby
-@datatable = Effective::Datatables::Posts.new(params[:scopes])
-```
-
-So initially, the `:start_date` will have the value of `Time.zone.now-3.months` and when submitted by the form, the value will be set there.
-
-The form value will come back as a string, so you may need to `Time.zone.parse` that value.
-
-Pass `scope :start_date, Time.zone.now-3.months, fallback: true` to fallback to the default value when the form submission is not present.
-
-Any `filter: { ... }` options will be passed straight into simple_form.
-
-## aggregates
-
-Each `aggregate` directive adds an additional row to the table's tfoot.
-
-This feature is intended to display a sum or average of all the table's currently displayed values.
-
-```ruby
-aggregate :average do |table_column, values, table_data|
-  if table_column[:name] == 'user'
-    'Average'
-  else
-    average = (values.sum { |value| convert_to_column_type(table_column, value) } / [values.length, 1].max)
-    content_tag(:span, number_to_percentage(average, precision: 0))
+  # You should probably write this inside a transaction.  This is just an example.
+  begin
+    @posts.each { |post| post.approve! }
+    render json: { status: 200, message: "Successfully approved #{@posts.length} posts." }
+  rescue => e
+    render json: { status: 500, message: 'An error occured while approving a post.' }
   end
 end
 ```
 
-The above aggregate block will be called for each currently visible column in a datatable.
-
-Here `table_column` is the table_column being rendered, `values` is an array of all the values in this one column. `table_data` is the whole transposed array of data.
-
-The values will be whatever datatype each table_column returns.
-
-It might be the case that the formatted values (strings) are returned, which is why `convert_to_column_type` is used above.
-
-## table_columns
-
-Quickly create multiple table_columns all with default options:
+or if using [effective_resources](https://github.com/code-and-effect/effective_resources):
 
 ```ruby
-table_columns :id, :created_at, :updated_at, :category, :title
+include Effective::CrudController
 ```
 
-## default_order
-
-Sort the table by this field and direction on start up
+and in your model
 
 ```ruby
-default_order :created_at, :asc|:desc
-```
-
-## default_entries
-
-The number of entries to show per page
-
-```ruby
-default_entries :all
-```
-
-Valid options are `10, 25, 50, 100, 250, 1000, :all`
-
-## Additional Functionality
-
-There are a few other ways to customize the behaviour of effective_datatables
-
-### Checking for Empty collection
-
-Check whether the datatable has records by calling `@datatable.empty?` and `@datatable.present?`.
-
-Keep in mind, these methods look at the collection's total records, not the currently displayed/filtered records.
-
-### Hide the buttons
-
-To hide the Bulk Actions, Show / Hide Columns, CSV, Excel, Print, etc buttons:
-
-```ruby
-render_datatable(@datatable, buttons: false)
-```
-
-### Override javascript options
-
-The javascript options used to initialize a datatable can be overriden as follows:
-
-```ruby
-render_datatable(@datatable, {dom: "<'row'<'col-sm-12'tr>>", autoWidth: true})
-```
-
-Please see [datatables options](https://datatables.net/reference/option/) for a list of initialization options.
-
-
-### Customize Filter Behaviour
-
-This gem does its best to provide "just works" filtering of both raw SQL (table_column) and processed results (array_column) out-of-the-box.
-
-It's also very easy to override the filter behaviour on a per-column basis.
-
-Keep in mind, that filter terms applied to hidden columns will still be considered in filter results.
-
-To customize filter behaviour, specify a `def search_column` method in the datatables model file.
-
-If the table column being customized is a table_column:
-
-```ruby
-def search_column(collection, table_column, search_term, sql_column)
-  if table_column[:name] == 'subscription_types'
-    collection.where('subscriptions.stripe_plan_id ILIKE ?', "%#{search_term}%")
-  else
-    super
-  end
+def approve!
+  update_attributes!(status: :approved)
 end
 ```
 
-And if the table column being customized is an array_column:
+### bulk_action_divider
+
+Inserts a menu divider `<li class='divider' role='separator'></li>`
+
+### bulk_download
+
+So it turns out there are some http issues with using an AJAX action to download a file.
+
+A workaround for these issues is included via the [jQuery File Download Plugin](http://johnculviner.com/jquery-file-download-plugin-for-ajax-like-feature-rich-file-downloads/)
+
+The use case for this feature is to download a csv report generated for the selected rows.
 
 ```ruby
-def search_column(collection, table_column, search_term, index)
-  if table_column[:name] == 'price'
-    collection.select! { |row| row[index].include?(search_term) }
-  else
-    super
-  end
+bulk_actions do
+  bulk_download 'Export Report', bulk_export_report_path
 end
 ```
 
-### Customize Order Behaviour
-
-The order behaviour can be overridden on a per-column basis.
-
-To custom order behaviour, specify a `def order_column` method in the datatables model file.
-
-If the table column being customized is a table_column:
-
 ```ruby
-def order_column(collection, table_column, direction, sql_column)
-  if table_column[:name] == 'subscription_types'
-    sql_direction = (direction == :desc ? 'DESC' : 'ASC')
-    collection.joins(:subscriptions).order("subscriptions.stripe_plan_id #{sql_direction}")
-  else
-    super
-  end
-end
-```
+def bulk_export_report
+  authorize! :export, Post
 
-And if the table column being customized is an array_column:
+  @posts = Post.where(id: params[:ids])
 
-```ruby
-def order_column(collection, table_column, direction, index)
-  if table_column[:name] == 'price'
-    if direction == :asc
-      collection.sort! { |a, b| a[index].gsub(/\D/, '').to_i <=> b[index].gsub(/\D/, '').to_i }
-    else
-      collection.sort! { |a, b| b[index].gsub(/\D/, '').to_i <=> a[index].gsub(/\D/, '').to_i }
+  Post.transaction do
+    begin
+      cookies[:fileDownload] = true
+
+      send_data(PostsExporter.new(@posts).export,
+        type: 'text/csv; charset=utf-8; header=present',
+        filename: 'posts-export.csv'
+      )
+
+      @posts.update_all(exported_at: Time.zone.now)
+      return
+    rescue => e
+      cookies.delete(:fileDownload)
+      raise ActiveRecord::Rollback
     end
-  else
-    super
+  end
+
+  render json: { error: 'An error occurred' }
+end
+```
+
+### bulk_action_content
+
+Blindly inserts content into the dropdown.
+
+```ruby
+bulk_actions do
+  bulk_action_content do
+    content_tag(:li, 'Something')
   end
 end
 ```
 
-### Initialize with attributes
+Don't actually use this.
 
-Any attributes passed to `.new()` will be persisted through the lifecycle of the datatable.
+## charts
 
-You can use this to scope the datatable collection or create even more advanced search behaviour.
+Create a [Google Chart](https://developers.google.com/chart/interactive/docs/quick_start) based on your searched collection, filters and attributes.
 
-In the following example we will hide the User column and scope the collection to a specific user.
+No javascript required. Just use the `chart do ... end` block and return an Array of Arrays.
 
-In your controller:
+```ruby
+charts do
+  chart :breakfast, 'BarChart' do |collection|
+    [
+      ['Bacon', 10],
+      ['Eggs', 20],
+      ['Toast', 30]
+    ]
+  end
+
+  chart :posts_per_day, 'LineChart', label: 'Posts per Day', legend: false do |collection|
+    collection.group_by { |post| post.created_at.beginning_of_day }.map do |date, posts|
+      [date.strftime('%F'), posts.length]
+    end
+  end
+end
+```
+
+And then render each chart in your view:
+
+```
+<%= render_datatable_chart(@datatable, :breakfast) %>
+<%= render_datatable_chart(@datatable, :posts_per_day) %>
+```
+
+or all together
+
+```
+<%= render_datatable_charts(@datatable) %>
+```
+
+All options passed to `chart` are used to initialize the chart javascript.
+
+By default, the only package that is loaded is `corechart`, see the `config/initializers/effective_datatables.rb` file to add more packages.
+
+## Extras
+
+The following commands don't quite fit into the DSL, but are present nonetheless.
+
+### simple
+
+To render a simple table, without pagination, sorting, filtering, export buttons, per page, and default visibility:
+
+```
+<%= render_datatable(@datatable, simple: true) %>
+```
+
+### index
+
+If you just want to render a datatable and nothing else, there is a quick way to skip creating a view:
 
 ```ruby
 class PostsController < ApplicationController
   def index
-    @datatable = Effective::Datatables::Posts.new(:user_id => current_user.try(:id))
+    render_datatable_index PostsDatatable.new(self)
   end
 end
 ```
 
-And then in your datatable:
+will render `views/effective/datatables/index` with the assigned datatable.
+
+## Advanced Search and Sort
+
+The built-in search and ordering can be overridden on a per-column basis.
+
+The only gotcha here is that you must be aware of the type of collection.
+
+### With ActiveRecord collection
+
+In the case of a `col` and an ActiveRecord collection:
 
 ```ruby
-module Effective
-  module Datatables
-    class Posts < Effective::Datatable
-      datatable do
-        if attributes[:user_id].blank?
-          table_column :user_id { |post| post.user.email }
-        end
-      end
+collection do
+  Post.all
+end
 
-      def collection
-        if attributes[:user_id]
-          Post.where(user_id: attributes[:user_id])
-        else
-          Post.all
-        end
-      end
+datatable do
+  col :post_category do |post|
+    content_tag(:span, post.post_category, "badge-#{post.post_category}")
+  end.search do |collection, term, column, sql_column|
+    # collection is an ActiveRecord scoped collection
+    # term is the incoming PostCategory ID as per the search
+    # column is this column's options Hash
+    # sql_column is the column[:sql_column]
+    categories = current_user.post_categories.where(id: term.to_i)
 
+    collection.where(post_category_id: categories)  # Must return an ActiveRecord scope
+  end.sort do |collection, direction, column, sql_column|
+    collection.joins(:post_category).order(:post_category => :title, direction)
+  end
+end
+```
+
+If you run into issues where `collection` here is an Array, you're probably using some joins in your `collection do ... end` block.
+
+If `column[:sql_column].blank?` then this `col` has fallen back to being a `val`.
+
+Try adding `col :post_category, sql_column: 'post_categories.title'`
+
+### With Array collection
+
+And in the case of a `col` with an Array collection, or any `val`:
+
+```ruby
+collection do
+  Client.all.map do |client|
+    [client, client.first_name client.last_name, client.purchased_time()]
+  end
+end
+
+datatable do
+  col :client
+  col :first_name
+  col :last_name
+
+  col :purchased_time do |duration|
+    number_to_duration(duration)
+  end.search do |collection, term, column, index|
+    # collection is an Array of Arrays
+    # term is the incoming value as per the search. "3h30m"
+    # column is the column's attributes Hash
+    # index is this column's index in the collection
+    (hours, minutes) = term.to_s.gsub(/[^0-9|h]/, '').split.map(&:to_i)
+    duration = (hours.to_i * 60) + minutes.to_i
+
+    collection.select! { |row| row[index] == duration }  # Must return an Array of Arrays
+  end.sort do |collection, term, column, index|
+    collection.sort! do |x, y|
+      x[index] <=> y[index]
     end
   end
 end
 ```
 
-### Helper methods
+The search and sort for each column will be merged together to form the final results.
 
-Any non-private methods defined in the datatable model will be available to your table_columns and evaluated in the view_context.
+### Default search collection
+
+When using a `col :comments` type belongs_to or has_many column, a search collection for that class will be loaded.
+
+Add the following to your related model to customize the search collection:
 
 ```ruby
-module Effective
-  module Datatables
-    class Posts < Effective::Datatable
-      def format_post_title(post)
-        if post.title.start_with?('important')
-          link_to(post.title.upcase, post_path(post))
-        else
-          link_to(post.title, post_path(post))
-        end
-      end
+class Comment < ApplicationRecord
+  scope :datatables_filter, -> { includes(:user) }
+end
+```
 
-      datatable do
-        table_column :title do |post|
-          format_post_title(post)
-        end
-      end
+Datatables will look for a `datatables_filter` scope, or `sorted` scope, or fallback to `all`.
 
-      def collection
-        Post.all
+If there are more than 500 max records, the filter will fallback to a `as: :string`.
+
+## Dynamic Column Count
+
+There are some extra steps to be taken if you want to change the number of columns based on `filters`.
+
+Unfortunately, the DataTables jQuery doesn't support changing columns, so submitting filters needs to be done via POST instead of AJAX.
+
+The following example displays a client column, and one column per month for each month in a date range:
+
+```ruby
+class TimeEntriesPerClientReport < Effective::Datatable
+
+  filters do
+    # This instructs the filters form to use a POST, if available, or GET instead of AJAX
+    # It posts to the current controller/action, and there are no needed changes in your controller
+    changes_columns_count
+
+    filter :start_date, (Time.zone.now - 6.months).beginning_of_month, required: true, label: 'For the month of: ', as: :effective_date_picker
+    filter :end_date, Time.zone.now.end_of_month, required: true, label: 'upto and including the whole month of', as: :effective_date_picker
+  end
+
+  datatable do
+    length :all
+
+    col :client
+
+    selected_months.each do |month|
+      col month.strftime('%b %Y'), as: :duration
+    end
+
+    actions_col
+  end
+
+  collection do
+    time_entries = TimeEntry.where(date: filter[:start_date].beginning_of_month...filter[:end_date].end_of_month)
+      .group_by { |time_entry| "#{time_entry.client_id}_#{time_entry.created_at.strftime('%b')}" }
+
+    Client.all.map do |client|
+      [client] + selected_months.map do |month|
+        entries = time_entries["#{client.id}_#{month.strftime('%b')}"] || []
+
+        entries.map { |entry| entry.duration }.sum
       end
+    end
+  end
+
+  # Returns an array of 2016-Jan-01, 2016-Feb-01 datetimes
+  def selected_months
+    @selected_months ||= [].tap do |months|
+      each_month_between(filter[:start_date].beginning_of_month, filter[:end_date].end_of_month) { |month| months << month }
+    end
+  end
+
+  # Call with each_month_between(start_date, end_date) { |date| puts date }
+  def each_month_between(start_date, end_date, &block)
+    while start_date <= end_date
+      block.call(start_date)
+      start_date = start_date + 1.month
     end
   end
 end
 ```
 
-You can also get the same functionality by including a regular Rails helper within the datatable model.
+# Additional Functionality
+
+There are a few other ways to customize the behaviour of effective_datatables
+
+## Checking for Empty collection
+
+Check whether the datatable has records by calling `@datatable.present?` and `@datatable.blank?`.
+
+## Override javascript options
+
+The javascript options used to initialize a datatable can be overriden as follows:
 
 ```ruby
-module PostHelper
-end
+render_datatable(@datatable, input_js: { dom: "<'row'<'col-sm-12'tr>>", autoWidth: true })
 ```
 
 ```ruby
-module Effective
-  module Datatables
-    class Posts < Effective::Datatable
-      include PostsHelper
-
-    end
-  end
-end
+render_datatable(@datatable, input_js: { buttons_export_columns: ':visible:not(.col-actions)' })
 ```
 
-## Working with other effective_gems
+Please see [datatables options](https://datatables.net/reference/option/) for a list of initialization options.
 
-### Effective Addresses
-
-When working with an ActiveRecord collection that implements [effective_addresses](https://github.com/code-and-effect/effective_addresses),
-the filters and sorting will be automatically configured.
-
-Just define `table_column :addresses`
-
-When filtering values in this column, the address1, address2, city, postal code, state code and country code will all be matched.
-
-### Effective Obfuscation
-
-When working with an ActiveRecord collection that implements [effective_obfuscation](https://github.com/code-and-effect/effective_obfuscation) for the ID column,
-that column's filters and sorting will be automatically configured.
-
-Just define `table_column :id`
-
-Unfortunately, due to the effective_obfuscation algorithm, sorting and filtering by partial values is not supported.
-
-So the column may not be sorted, and may only be filtered by typing the entire 10-digit number, with or without any formatting.
-
-### Effective Roles
-
-When working with an ActiveRecord collection that implements [effective_roles](https://github.com/code-and-effect/effective_roles),
-the filters and sorting will be automatically configured.
-
-Just define `table_column :roles`
-
-The `EffectiveRoles.roles` collection will be used for the filter collection, and sorting will be done by roles_mask.
-
+You don't want to actually do this!
 
 ## Get access to the raw results
 
@@ -922,49 +1152,9 @@ rescue_from Effective::AccessDenied do |exception|
 end
 ```
 
-## Examples
-
-### Search by a belongs_to objects' field
-
-In this example, a User belongs_to an Applicant.  But instead of using the built in belongs_to functionality and displaying a dropdown of users, instead we want to search by the user's email address:
-
-```ruby
-module Effective
-  module Datatables
-    class Applicants < Effective::Datatable
-      datatable do
-        table_column :id, visible: true
-
-        table_column :user, :type => :string, :column => 'users.email' do |applicant|
-          link_to applicant.user.try(:email), edit_admin_user_path(applicant.user)
-        end
-      end
-
-      def collection
-        col = Applicant.joins(:user).includes(:user).references(:user)
-      end
-    end
-  end
-end
-```
-
-
 ## License
 
 MIT License.  Copyright [Code and Effect Inc.](http://www.codeandeffect.com/)
-
-Code and Effect is the product arm of [AgileStyle](http://www.agilestyle.com/), an Edmonton-based shop that specializes in building custom web applications with Ruby on Rails.
-
-
-## Testing
-
-The test suite for this gem is unfortunately not yet complete.
-
-Run tests by:
-
-```ruby
-rake spec
-```
 
 ## Contributing
 

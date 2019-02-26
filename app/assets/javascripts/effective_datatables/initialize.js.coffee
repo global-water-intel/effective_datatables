@@ -1,71 +1,12 @@
-resetFilters = ->
-  window.location.pathname = window.location.pathname + '/reset_filters'
-resetAll = ->
-  window.location.pathname = window.location.pathname + '/reset_all'
-
-initializeDataTables = ->
-  $('table.effective-datatable').each ->
-    return if $.fn.DataTable.fnIsDataTable(this)
-
+initializeDataTables = (target) ->
+  $(target || document).find('table.effective-datatable:not(.initialized)').each ->
     datatable = $(this)
-    simple = (datatable.data('simple') == true)
-    resetFilterButtons = (datatable.data('reset-filter-buttons') == true)
-    baseButtons = [
-      {
-        extend: 'colvis',
-        text: 'Show / hide columns',
-        postfixButtons: [
-          { extend: 'colvisGroup', text: 'Show all', show: ':hidden'},
-          { extend: 'colvisRestore', text: 'Show default'}
-        ]
-      },
-      {
-        extend: 'copy',
-        exportOptions:
-          format:
-            header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
-          columns: ':not(.col-actions)'
-      },
-      {
-        extend: 'csv',
-        exportOptions:
-          format:
-            header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
-          columns: ':not(.col-actions)'
-      },
-      {
-        extend: 'excel',
-        exportOptions:
-          format:
-            header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
-          columns: ':not(.col-actions)'
-      },
-      {
-        extend: 'print',
-        exportOptions:
-          format:
-            header: (str) -> $("<div>#{str}</div>").children('.filter-label').first().text()
-          columns: ':visible:not(.col-actions)'
-      },
-    ]
+    options = datatable.data('options') || {}
+    buttons_export_columns = options['buttons_export_columns'] || ':not(.col-actions)'
+    reorder = datatable.data('reorder')
 
-    if resetFilterButtons
-      extraButtons = [
-        {
-          text: 'Reset Filters',
-          action: resetFilters
-        },
-        {
-          text: 'Reset Everything',
-          action: resetAll
-        },
-      ]
-    else
-      extraButtons = []
-    input_js_options = datatable.data('input-js-options') || {}
-
-    if input_js_options['buttons'] == false
-      input_js_options['buttons'] = []
+    if options['buttons'] == false
+      options['buttons'] = []
 
     init_options =
       dom: "<'row'<'col-sm-4'l><'col-sm-8'B>><'row'<'col-sm-12'tr>><'row'<'col-sm-6'i><'col-sm-6'p>>"
@@ -73,58 +14,102 @@ initializeDataTables = ->
       pageLength: datatable.data('page-length')
       ajax: { url: datatable.data('source'), type: 'POST' }
       autoWidth: false
-      buttons: extraButtons.concat(baseButtons)
-      colReorder: false
-      # colReorder: !simple
+      buttons: [
+        {
+          extend: 'colvis',
+          text: 'Show / Hide',
+          postfixButtons: [
+            { extend: 'colvisGroup', text: 'Show all', show: ':hidden', className: 'buttons-colvisGroup-first'},
+            { extend: 'colvisGroup', text: 'Show none', hide: ':visible'}
+            { extend: 'colvisRestore', text: 'Show default'}
+          ]
+        },
+        {
+          extend: 'copy',
+          exportOptions:
+            format:
+              header: (str) -> $("<div>#{str}</div>").children('span').first().text()
+            columns: buttons_export_columns
+        },
+        {
+          extend: 'csv',
+          exportOptions:
+            format:
+              header: (str) -> $("<div>#{str}</div>").children('span').first().text()
+            columns: buttons_export_columns
+        },
+        {
+          extend: 'print',
+          footer: true,
+          exportOptions:
+            format:
+              header: (str) -> $("<div>#{str}</div>").children('span').first().text()
+            columns: ':visible:not(.col-actions)'
+        },
+      ]
       columns: datatable.data('columns')
       deferLoading: [datatable.data('display-records'), datatable.data('total-records')]
       deferRender: true
-      iDisplayLength: datatable.data('display-entries')
-      language: { 'lengthMenu': 'Show _MENU_ per page'}
-      lengthMenu: [[5, 10, 15, 20, 25, 50, 100, 250, 1000, -1], ['5', '10', '15', '20', '25', '50', '100', '250', '1000', 'All']]
-      order: datatable.data('default-order')
+      displayStart: datatable.data('display-start')
+      iDisplayLength: datatable.data('display-length')
+      language: { 'lengthMenu': '&nbsp;with _MENU_ per page'}
+      lengthMenu: [[5, 10, 25, 50, 100, 250, 500, 9999999], ['5', '10', '25', '50', '100', '250', '500', 'All']]
+      order: datatable.data('display-order')
       processing: true
       responsive: false
       serverParams: (params) ->
-        table = this.api()
-        table.columns().flatten().each (index) =>
-          params['columns'][index]['visible'] = table.column(index).visible()
+        api = this.api()
+        api.columns().flatten().each (index) => params['columns'][index]['visible'] = api.column(index).visible()
+
+        $table = $(api.table().node())
+        $form = $(".effective-datatables-filters[aria-controls='#{$table.attr('id')}']").first()
+
+        params['cookie'] = $table.data('cookie')
+
+        if $form.length > 0
+          params['scope'] = $form.find("input[name='filters[scope]']:checked").val() || ''
+          params['filter'] = {}
+
+          $form.find("select,textarea,input:not([type=submit]):not([name='filters[scope]'])").each ->
+            $input = $(this)
+            if $input.attr('id')
+              params['filter'][$input.attr('id').substring(8, $input.attr('id').length)] = $input.val()
+
       serverSide: true
       scrollCollapse: true
       pagingType: 'simple_numbers'
       initComplete: (settings) ->
-        initializeBulkActions(this.api())
-        initializeFilters(this.api())
+        initializeButtons(this.api())
+        initializeSearch(this.api())
       drawCallback: (settings) ->
         $table = $(this.api().table().node())
-        selected = $table.data('bulk-actions-restore-selected-values')
-        completeBulkAction($table, selected) if selected && selected.length > 0
 
         if settings['json']
+          if settings['json']['effective_datatables_error']
+            alert("DataTable error: #{settings['json']['effective_datatables_error']}\n\nPlease refresh the page and try again")
+            return
+
           if settings['json']['aggregates']
             drawAggregates($table, settings['json']['aggregates'])
 
           if settings['json']['charts']
             drawCharts($table, settings['json']['charts'])
 
+          $table.children('tbody').trigger('effective-bootstrap:initialize')
+
     # Copies the bulk actions html, stored in a data attribute on the table, into the buttons area
-    initializeBulkActions = (api) ->
+    initializeButtons = (api) ->
       $table = $(api.table().node())
-      bulkActions = $table.data('bulk-actions')
+      $buttons = $table.closest('.dataTables_wrapper').children().first().find('.dt-buttons')
 
-      if bulkActions
-        $table.closest('.dataTables_wrapper').children().first()
-          .find('.dt-buttons').first().prepend(bulkActions['dropdownHtml'])
+      if $table.data('reset')
+        $buttons.prepend($table.data('reset'))
 
-    # After we perform a bulk action, we have to re-select the checkboxes manually and do a bit of house keeping
-    completeBulkAction = ($table, selected) ->
-      $table.find("input[data-role='bulk-actions-resource']").each (_, input) ->
-        $input = $(input)
-        $input.prop('checked', selected.indexOf($input.val()) > -1)
+      if $table.data('reorder')
+        $buttons.prepend($table.data('reorder'))
 
-      $wrapper = $table.closest('.dataTables_wrapper')
-      $wrapper.children().first().find('.buttons-bulk-actions').children('button').removeAttr('disabled')
-      $table.siblings('.dataTables_processing').html('Processing...')
+      if $table.data('bulk-actions')
+        $buttons.prepend($table.data('bulk-actions'))
 
     drawAggregates = ($table, aggregates) ->
       $tfoot = $table.find('tfoot').first()
@@ -138,28 +123,27 @@ initializeDataTables = ->
 
 
     drawCharts = ($table, charts) ->
-      $.each charts, (name, data) =>
-        $(".effective-datatables-chart[data-name='#{name}']").each (_, obj) =>
-          chart = new google.visualization[data['type']](obj)
-          chart.draw(google.visualization.arrayToDataTable(data['data']), data['options'])
+      if typeof(google) != 'undefined' && typeof(google.visualization) != 'undefined'
+        $.each charts, (name, data) =>
+          $(".effective-datatables-chart[data-name='#{name}']").each (_, obj) =>
+            chart = new google.visualization[data['type']](obj)
+            chart.draw(google.visualization.arrayToDataTable(data['data']), data['options'])
 
-    # Appends the filter html, stored in the column definitions, into each column header
-    initializeFilters = (api) ->
+    # Appends the search html, stored in the column definitions, into each column header
+    initializeSearch = (api) ->
       api.columns().flatten().each (index) =>
         $th = $(api.column(index).header())
         settings = api.settings()[0].aoColumns[index] # column specific settings
 
-        if settings.filterSelectedValue  # Assign preselected filter values
-          api.settings()[0].aoPreSearchCols[index].sSearch = settings.filterSelectedValue
+        if settings.search != null # Assign preselected values
+          api.settings()[0].aoPreSearchCols[index].sSearch = settings.search
 
-        if settings.filterHtml  # Append the html filter HTML and initialize input events
-          $th.append('<br>' + settings.filterHtml)
-          if !$th.hasClass('col-bulk_actions_column')
-            api.column(index).search($th.find('input,select').val())
-          initializeFilterEvents($th)
+        if settings.searchHtml  # Append the search html and initialize input events
+          $th.append(settings.searchHtml)
+          initializeSearchEvents($th)
 
     # Sets up the proper events for each input
-    initializeFilterEvents = ($th) ->
+    initializeSearchEvents = ($th) ->
       $th.find('input,select').each (_, input) ->
         $input = $(input)
 
@@ -178,32 +162,31 @@ initializeDataTables = ->
 
     # Do the actual search
     dataTableSearch = ($input) ->   # This is the function called by a select or input to run the search
+      return if $input.is(':invalid')
+
       table = $input.closest('table.dataTable')
       table.DataTable().column("#{$input.data('column-name')}:name").search($input.val()).draw()
 
-    if simple
-      init_options['dom'] = "<'row'<'col-sm-12'tr>>" # Just show the table
-      datatable.addClass('sort-hidden')
+    if reorder
+      init_options['rowReorder'] = { selector: 'td.col-_reorder', snapX: true, dataSrc: datatable.data('reorder-index') }
 
     # Let's actually initialize the table now
-    table = datatable.dataTable(jQuery.extend(init_options, input_js_options))
+    table = datatable.dataTable(jQuery.extend(init_options, options))
+
+    # Fix a tabindex issue
+    table.children('tbody').children('tr').children('td[tabindex]').removeAttr('tabindex')
 
     # Apply EffectiveFormInputs to the Show x per page dropdown
-    if datatable.data('effective-form-inputs')
-      try table.closest('.dataTables_wrapper').find('.dataTables_length select').select2()
+    try table.closest('.dataTables_wrapper').find('.dataTables_length select').removeAttr('name').select2(minimumResultsForSearch: 100)
 
-    # Capture column visibility changes and refresh datatable
-    datatable.on 'column-visibility.dt', (event, settings, index, state) ->
-      $table = $(event.currentTarget)
+    if reorder
+      table.DataTable().on('row-reorder', (event, diff, edit) -> $(event.target).DataTable().reorder(event, diff, edit))
 
-      timeout = $table.data('timeout')
-      clearTimeout(timeout) if timeout
-      $table.data('timeout', setTimeout( =>
-          $table.DataTable().draw()
-          # TODO: not clear why this event trigger below was necessary. Disable for now as it causes ugly reinitialization issues.
-          # $.event.trigger('turbolinks:load')
-        , 700)
-      )
+    table.addClass('initialized')
+
+destroyDataTables = ->
+  $('.effective-datatables-inline-expanded').removeClass('effective-datatables-inline-expanded')
+  $('table.effective-datatable').each -> try $(this).removeClass('initialized').DataTable().destroy()
 
 destroyDataTables = ->
   $('table.effective-datatable').each ->
@@ -211,7 +194,9 @@ destroyDataTables = ->
       $(this).DataTable().destroy()
 
 $ -> initializeDataTables()
-$(document).on 'turbolinks:load', -> initializeDataTables()
-$(document).on 'effective-datatables:initialize', -> initializeDataTables()
-$(document).on 'turbolinks:before-cache', -> destroyDataTables()
+$(document).on 'effective-datatables:initialize', (event) -> initializeDataTables(event.currentTarget)
 
+$(document).on 'page:change', -> initializeDataTables()
+$(document).on 'turbolinks:load', -> initializeDataTables()
+$(document).on 'turbolinks:render', -> initializeDataTables()
+$(document).on 'turbolinks:before-cache', -> destroyDataTables()

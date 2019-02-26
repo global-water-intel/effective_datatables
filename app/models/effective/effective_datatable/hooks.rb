@@ -6,32 +6,6 @@ module Effective
         collection
       end
 
-      # Override this function to perform custom searching on a column
-      def search_column(collection, table_column, search_term, sql_column_or_array_index)
-        if table_column[:array_column]
-          array_tool.search_column_with_defaults(collection, table_column, search_term, sql_column_or_array_index)
-        else
-          if elasticsearch_collection?
-            elasticsearch_tool.search_column_with_defaults(collection, table_column, search_term, sql_column_or_array_index)
-          else
-            table_tool.search_column_with_defaults(collection, table_column, search_term, sql_column_or_array_index)
-          end
-        end
-      end
-
-      # Override this function to perform custom ordering on a column
-      # direction will be :asc or :desc
-      def order_column(collection, table_column, direction, sql_column_or_array_index)
-        if table_column[:array_column]
-          array_tool.order_column_with_defaults(collection, table_column, direction, sql_column_or_array_index)
-        else
-          if elasticsearch_collection?
-            elasticsearch_tool.order_column_with_defaults(collection, table_column, direction, sql_column_or_array_index)
-          else
-            table_tool.order_column_with_defaults(collection, table_column, direction, sql_column_or_array_index)
-          end
-        end
-      end
     end
   end
 end

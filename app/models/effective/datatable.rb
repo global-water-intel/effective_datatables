@@ -1,310 +1,183 @@
 module Effective
   class Datatable
-    attr_accessor :display_records, :view, :attributes
+    attr_reader :attributes # Anything that we initialize our table with. That's it. Can't be changed by state.
+    attr_reader :resource
+    attr_reader :state
 
-    # These two options control the render behaviour of a datatable
-    attr_accessor :table_html_class, :simple
+    # Hashes of DSL options
+    attr_reader :_aggregates
+    attr_reader :_bulk_actions
+    attr_reader :_charts
+    attr_reader :_columns
+    attr_reader :_filters
+    attr_reader :_form
+    attr_reader :_scopes
 
-    delegate :render, :controller, :link_to, :mail_to, :number_to_currency, :number_to_percentage, :to => :@view
+    # The collection itself. Only evaluated once.
+    attr_accessor :_collection
+
+    # The view
+    attr_reader :view
 
     extend Effective::EffectiveDatatable::Dsl
-    include Effective::EffectiveDatatable::Dsl::BulkActions
-    include Effective::EffectiveDatatable::Dsl::Charts
-    include Effective::EffectiveDatatable::Dsl::Datatable
-    include Effective::EffectiveDatatable::Dsl::Scopes
 
-    include Effective::EffectiveDatatable::Ajax
-    include Effective::EffectiveDatatable::Charts
-    include Effective::EffectiveDatatable::Helpers
+
+    include Effective::EffectiveDatatable::Attributes
+    include Effective::EffectiveDatatable::Collection
+    include Effective::EffectiveDatatable::Compute
+    include Effective::EffectiveDatatable::Cookie
+    include Effective::EffectiveDatatable::Format
     include Effective::EffectiveDatatable::Hooks
-    include Effective::EffectiveDatatable::Options
-    include Effective::EffectiveDatatable::Rendering
+    include Effective::EffectiveDatatable::Params
+    include Effective::EffectiveDatatable::Resource
+    include Effective::EffectiveDatatable::State
     include Effective::Overrides
 
-    def initialize(*args)
-      if args.present? && args.first != nil
-        raise "#{self.class.name}.new() can only be initialized with a Hash like arguments" unless args.first.kind_of?(Hash)
-        args.first.each { |k, v| self.attributes[k] = v }
+    def initialize(view = nil, attributes = {})
+      (attributes = view; view = nil) if view.kind_of?(Hash)
+
+      @attributes = initial_attributes(attributes)
+      @state = initial_state
+
+      @_aggregates = {}
+      @_bulk_actions = []
+      @_charts = {}
+      @_columns = {}
+      @_filters = {}
+      @_form = {}
+      @_scopes = {}
+
+      raise 'collection is defined as a method. Please use the collection do ... end syntax.' unless collection.nil?
+      self.view = view if view
+    end
+
+    # Once the view is assigned, we initialize everything
+    def view=(view)
+      @view = (view.respond_to?(:view_context) ? view.view_context : view)
+      raise 'expected view to respond to params' unless @view.respond_to?(:params)
+
+      load_cookie!
+      load_attributes!
+
+      # We need early access to filter and scope, to define defaults from the model first
+      # This means filters do knows about attributes but not about columns.
+      initialize_filters if respond_to?(:initialize_filters)
+      load_filters!
+      load_state!
+
+      # Bulk actions called first so it can add the bulk_actions_col first
+      initialize_bulk_actions if respond_to?(:initialize_bulk_actions)
+
+      # Now we initialize all the columns. columns knows about attributes and filters and scope
+      initialize_datatable if respond_to?(:initialize_datatable)
+      load_columns!
+
+      # Execute any additional DSL methods
+      initialize_charts if respond_to?(:initialize_charts)
+
+      # Load the collection. This is the first time def collection is called on the Datatable itself
+      initialize_collection if respond_to?(:initialize_collection)
+      load_collection!
+
+      # Figure out the class, and if it's activerecord, do all the resource discovery on it
+      load_resource!
+      apply_belongs_to_attributes!
+      load_resource_search!
+
+      # Check everything is okay
+      validate_datatable!
+
+      # Save for next time
+      save_cookie!
+    end
+
+    def present?(view = nil)
+      unless (@view || view)
+        raise 'unable to call present? without an assigned view. In your view, either call render_datatable(@datatable) first, or use @datatable.present?(self)'
       end
 
-      self.view = self.attributes[:view] if self.attributes[:view].present?
+      self.view ||= view
 
-      if respond_to?(:initialize_scopes)  # There was at least one scope defined in the scopes do .. end block
-        initialize_scopes
-        initialize_scope_options
+      to_json[:recordsTotal] > 0
+    end
+
+    def blank?(view = nil)
+      unless (@view || view)
+        raise 'unable to call blank? without an assigned view. In your view, either call render_datatable(@datatable) first, or use @datatable.blank?(self)'
       end
 
-      if respond_to?(:initialize_datatable)
-        initialize_datatable          # This creates @table_columns based on the DSL datatable do .. end block
-        initialize_datatable_options  # This normalizes all the options
-      end
+      self.view ||= view
 
-      if respond_to?(:initialize_charts)
-        initialize_charts
-        initialize_chart_options
-      end
-
-      unless active_record_collection? || array_collection? || elasticsearch_collection?
-        raise "Unsupported collection type. Should be ActiveRecord class, ActiveRecord relation, or an Array of Arrays [[1, 'something'], [2, 'something else']], or an Elasticsearch::Response"
-      end
-
-      if @default_order.present? && !table_columns.key?((@default_order.keys.first rescue nil))
-        raise "default_order :#{(@default_order.keys.first rescue 'nil')} must exist as a table_column or array_column"
-      end
-    end
-
-    def table_columns
-      @table_columns
-    end
-
-    def scopes
-      @scopes
-    end
-
-    def charts
-      @charts
-    end
-
-    def aggregates
-      @aggregates
-    end
-
-    # Any attributes set on initialize will be echoed back and available to the class
-    def attributes
-      @attributes ||= HashWithIndifferentAccess.new
-    end
-
-    def to_key; []; end # Searching & Filters
-
-    # Instance method.  In Rails 4.2 this needs to be defined on the instance, before it was on the class
-    def model_name # Searching & Filters
-      @model_name ||= ActiveModel::Name.new(self.class)
-    end
-
-    def self.model_name # Searching & Filters
-      @model_name ||= ActiveModel::Name.new(self)
-    end
-
-    def to_param
-      @to_param ||= self.class.name.underscore.sub('effective/datatables/', '')
-    end
-
-    def collection
-      raise "You must define a collection. Something like an ActiveRecord User.all or an Array of Arrays [[1, 'something'], [2, 'something else']]"
-    end
-
-    def collection_class
-      @collection_class ||= (collection.respond_to?(:klass) ? collection.klass : self.class)
+      to_json[:recordsTotal] == 0
     end
 
     def to_json
-      raise 'Effective::Datatable to_json called with a nil view.  Please call render_datatable(@datatable) or @datatable.view = view before this method' unless view.present?
-
-      @json ||= begin
-        data = table_data
-
-        json = {
-          :draw => (params[:draw] || 0),
-          :data => (data || []),
-          :recordsTotal => (total_records || 0),
-          :recordsFiltered => (display_records || 0),
-          :aggregates => (aggregate_data(data) || []),
-          :charts => (charts_data || {})
+      @json ||= (
+        {
+          data: (compute || []),
+          draw: (params[:draw] || 0),
+          recordsTotal: (@total_records || 0),
+          recordsFiltered: (@display_records || 0),
+          aggregates: (@aggregates_data || []),
+          charts: (@charts_data || {})
         }
-
-        if charts?
-          json[:chartRedraw] = view.render(partial: charts_partial, locals: { datatable: self, column_size: attributes[:column_size] })
-        end
-
-        json
-      end
-    end
-
-    def present?
-      total_records.to_i > 0
-    end
-
-    def empty?
-      total_records.to_i == 0
-    end
-
-    def total_records
-      @total_records ||= (
-        if active_record_collection?
-          if collection_class.connection.respond_to?(:unprepared_statement)
-            collection_sql = collection_class.connection.unprepared_statement { collection.to_sql }
-            (collection_class.connection.execute("SELECT COUNT(*) FROM (#{collection_sql}) AS datatables_total_count").first.to_a.map(&:second).first).to_i
-          else
-            (collection_class.connection.execute("SELECT COUNT(*) FROM (#{collection.to_sql}) AS datatables_total_count").first.to_a.map(&:second).first).to_i
-          end
-        elsif elasticsearch_collection?
-          elasticsearch_tool.unfiltered_total_entries(collection)
-        else
-          collection.size
-        end
       )
     end
 
-    def view=(view_context)
-      @view = view_context
-      @view.formats = [:html]
+    # Inline crud
+    def inline?
+      attributes[:inline] == true
+    end
 
-      # 'Just work' with attributes
-      @view.class.send(:attr_accessor, :attributes)
-      @view.attributes = self.attributes
+    # Reordering
+    def reorder?
+      columns.key?(:_reorder)
+    end
 
-      # Delegate any methods defined on the datatable directly to our view
-      @view.class.send(:attr_accessor, :effective_datatable)
-      @view.effective_datatable = self
+    def sortable?
+      !reorder? && attributes[:sortable] != false
+    end
 
-      unless @view.respond_to?(:bulk_action)
-        @view.class.send(:include, Effective::EffectiveDatatable::Dsl::BulkActions)
+    # Whether the filters must be rendered as a <form> or we can keep the normal <div> behaviour
+    def _filters_form_required?
+      _form[:verb].present?
+    end
+
+    def html_class
+      Array(attributes[:class] || EffectiveDatatables.html_class).join(' ').presence
+    end
+
+    def to_param
+      @to_param ||= "#{self.class.name.underscore.parameterize}-#{cookie_param}"
+    end
+
+    def columns
+      @_columns
+    end
+
+    def collection
+      @_collection
+    end
+
+    def dsl_tool
+      @dsl_tool ||= DatatableDslTool.new(self)
+    end
+
+    private
+
+    def column_tool
+      @column_tool ||= DatatableColumnTool.new(self)
+    end
+
+    def value_tool
+      @value_tool ||= DatatableValueTool.new(self)
+    end
+
+    def validate_datatable!
+      if reorder?
+        raise 'cannot use reorder with an Array collection' if array_collection?
+        raise 'cannot use reorder with a non-Integer column' if resource.sql_type(columns[:_reorder][:reorder]) != :integer
       end
-
-      Effective::EffectiveDatatable::Helpers.instance_methods(false).each do |helper_method|
-        @view.class_eval { delegate helper_method, to: :@effective_datatable }
-      end
-
-      (self.class.instance_methods(false) - [:collection, :search_column, :order_column]).each do |view_method|
-        @view.class_eval { delegate view_method, to: :@effective_datatable }
-      end
-
-      # Clear the search_terms memoization
-      @search_terms = nil
-      @order_name = nil
-      @order_direction = nil
-    end
-
-    def view_context
-      view
-    end
-
-    def table_html_class
-      @table_html_class.presence || 'table table-bordered table-striped'
-    end
-
-    # When simple only a table will be rendered with
-    # no sorting, no filtering, no export buttons, no pagination, no per page, no colReorder
-    # default sorting only, default visibility only, all records returned, and responsive enabled
-    def simple?
-      @simple == true
-    end
-
-    def reset_filter_buttons?
-      save_state?
-    end
-
-    def save_state?
-      attributes[:save_state] == true || attributes['save_state'] == 'true'
-    end
-
-    def charts?
-      charts_partial.present?
-    end
-
-    def charts_partial
-      attributes[:charts_partial]
-    end
-
-    def active_record_collection_size(collection)
-      count = (collection.size rescue nil)
-
-      case count
-      when Integer
-        count
-      when Hash
-        count.size  # This represents the number of displayed datatable rows, not the sum all groups (which might be more)
-      else
-        if collection.klass.connection.respond_to?(:unprepared_statement)
-          collection_sql = collection.klass.connection.unprepared_statement { collection.to_sql }
-          (collection.klass.connection.exec_query("SELECT COUNT(*) FROM (#{collection_sql}) AS datatables_total_count").rows[0][0] rescue 1)
-        else
-          (collection.klass.connection.exec_query("SELECT COUNT(*) FROM (#{collection.to_sql}) AS datatables_total_count").rows[0][0] rescue 1)
-        end.to_i
-      end
-    end
-
-    protected
-
-    def params
-      view.try(:params) || HashWithIndifferentAccess.new()
-    end
-
-    def table_tool
-      @table_tool ||= ActiveRecordDatatableTool.new(self, table_columns.reject { |_, col| col[:array_column] })
-    end
-
-    def array_tool
-      @array_tool ||= ArrayDatatableTool.new(self, table_columns.select { |_, col| col[:array_column] })
-    end
-
-    def elasticsearch_tool
-      @elasticsearch_tool ||= ElasticsearchDatatableTool.new(self, table_columns.reject { |_, col| col[:array_column] })
-    end
-
-    def active_record_collection?
-      @active_record_collection ||= (collection.ancestors.include?(ActiveRecord::Base) rescue false)
-    end
-
-    def initalize_table_columns(cols)
-      sql_table = (collection.table rescue nil)
-
-      # Here we identify all belongs_to associations and build up a Hash like:
-      # {:user => {:foreign_key => 'user_id', :klass => User}, :order => {:foreign_key => 'order_id', :klass => Effective::Order}}
-      belong_tos = (collection.ancestors.first.reflect_on_all_associations(:belongs_to) rescue []).inject(HashWithIndifferentAccess.new()) do |retval, bt|
-        unless bt.options[:polymorphic]
-          begin
-            klass = bt.klass || bt.foreign_type.gsub('_type', '').classify.constantize
-          rescue => e
-            klass = nil
-          end
-
-          retval[bt.name] = {:foreign_key => bt.foreign_key, :klass => klass} if bt.foreign_key.present? && klass.present?
-        end
-
-        retval
-      end
-
-      cols.each_with_index do |(name, _), index|
-        # If this is a belongs_to, add an :if clause specifying a collection scope if
-        if belong_tos.key?(name)
-          cols[name][:if] ||= Proc.new { attributes[belong_tos[name][:foreign_key]].blank? } # :if => Proc.new { attributes[:user_id].blank? }
-        end
-
-        sql_column = (collection.columns rescue []).find do |column|
-          column.name == name.to_s || (belong_tos.key?(name) && column.name == belong_tos[name][:foreign_key])
-        end
-
-        cols[name][:array_column] ||= false
-        cols[name][:array_index] = index # The index of this column in the collection, regardless of hidden table_columns
-        cols[name][:name] ||= name
-        cols[name][:label] ||= name.titleize
-        cols[name][:column] ||= (sql_table && sql_column) ? "`#{sql_table.name}`.`#{sql_column.name}`" : name
-
-        cols[name][:width] ||= nil
-        cols[name][:sortable] = true if cols[name][:sortable] == nil
-        cols[name][:type] ||= (belong_tos.key?(name) ? :belongs_to : (sql_column.try(:type).presence || :string))
-        cols[name][:class] = "col-#{cols[name][:type]} col-#{name} #{cols[name][:class]}".strip
-
-        if name == 'id' && collection.respond_to?(:deobfuscate)
-          cols[name][:sortable] = false
-          cols[name][:type] = :obfuscated_id
-        end
-
-        cols[name][:filter] = initialize_table_column_filter(cols[name][:filter], cols[name][:type], belong_tos[name])
-
-        if cols[name][:partial]
-          cols[name][:partial_local] ||= (sql_table.try(:name) || cols[name][:partial].split('/').last(2).first.presence || 'obj').singularize.to_sym
-        end
-      end
-    end
-
-    def elasticsearch_collection?
-      collection.class == ElasticsearchQueryBuilder rescue false
-    end
-
-    def array_collection?
-      collection.kind_of?(Array) && (collection.first.kind_of?(Array) || collection.blank?)
     end
   end
 end

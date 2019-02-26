@@ -1,33 +1,44 @@
-# require 'haml-rails'
-require 'kaminari'
-Kaminari.configure do |config|
-  config.page_method_name = :per_page_kaminari
-end
-
-require "effective_datatables/engine"
-require "effective_datatables/version"
+require 'effective_bootstrap'
+require 'effective_resources'
+require 'effective_datatables/engine'
+require 'effective_datatables/version'
 
 module EffectiveDatatables
   mattr_accessor :authorization_method
-  mattr_accessor :date_format
-  mattr_accessor :datetime_format
-  mattr_accessor :integer_format
-  mattr_accessor :boolean_format
 
-  mattr_accessor :default_entries
-  mattr_accessor :actions_column # A Hash
+  mattr_accessor :default_length
+  mattr_accessor :html_class
+  mattr_accessor :save_state
+  mattr_accessor :max_cookie_size
 
-  mattr_accessor :google_chart_packages
+  mattr_accessor :debug
 
   def self.setup
     yield self
   end
 
   def self.authorized?(controller, action, resource)
-    if authorization_method.respond_to?(:call) || authorization_method.kind_of?(Symbol)
-      raise Effective::AccessDenied.new() unless (controller || self).instance_exec(controller, action, resource, &authorization_method)
+    @_exceptions ||= [Effective::AccessDenied, (CanCan::AccessDenied if defined?(CanCan)), (Pundit::NotAuthorizedError if defined?(Pundit))].compact
+
+    return !!authorization_method unless authorization_method.respond_to?(:call)
+    controller = controller.controller if controller.respond_to?(:controller) # Do the right thing with a view
+
+    begin
+      !!(controller || self).instance_exec((controller || self), action, resource, &authorization_method)
+    rescue *@_exceptions
+      false
     end
-    true
+  end
+
+  def self.authorize!(controller, action, resource)
+    raise Effective::AccessDenied.new('Access Denied', action, resource) unless authorized?(controller, action, resource)
+  end
+
+  def self.find(id)
+    id = id.to_s.gsub(/-\d+\z/, '').gsub('-', '/')
+    klass = (id.classify.safe_constantize || id.classify.pluralize.safe_constantize)
+
+    klass.try(:new) || raise('unable to find datatable')
   end
 
 end

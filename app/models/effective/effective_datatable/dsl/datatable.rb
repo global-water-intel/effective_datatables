@@ -3,75 +3,177 @@ module Effective
     module Dsl
       module Datatable
         # Instance Methods inside the datatable do .. end block
-        def default_order(name, direction = :asc)
-          @default_order = {name => direction}
+        def length(length)
+          raise 'length must be 5, 10, 25, 50, 100, 250, 500, :all' unless [5, 10, 25, 50, 100, 250, 500, :all].include?(length)
+          datatable.state[:length] ||= (length == :all ? 9999999 : length)
         end
 
-        def default_entries(entries)
-          @default_entries = entries
+        def order(name, dir = nil)
+          raise 'order direction must be :asc or :desc' unless [nil, :asc, :desc].include?(dir)
+
+          datatable.state[:order_name] ||= name
+          datatable.state[:order_dir] ||= dir
         end
 
-        def table_column(name, options = {}, proc = nil, &block)
-          if block_given?
-            raise "You cannot use partial: ... with the block syntax" if options[:partial]
-            raise "You cannot use proc: ... with the block syntax" if options[:proc]
-            options[:block] = block
-          end
-          raise "You cannot use both partial: ... and proc: ..." if options[:partial] && options[:proc]
+        def reorder(name, dir = nil)
+          raise 'order direction must be :asc or :desc' unless [nil, :asc, :desc].include?(dir)
 
-          (@table_columns ||= HashWithIndifferentAccess.new)[name] = options
+          datatable.state[:order_name] = :_reorder
+          datatable.state[:order_dir] = dir
+
+          reorder_col(name)
         end
 
-        def array_column(name, options = {}, proc = nil, &block)
-          table_column(name, options.merge!(array_column: true), proc, &block)
+        # A col has its internal values sorted/searched before the block is run
+        # Anything done in the block, is purely a format on the after sorted/ordered value
+        # the original object == the computed value, which is yielded to the format block
+        # You can't do compute with .col
+        def col(name, action: nil, as: nil, col_class: nil, label: nil, partial: nil, partial_as: nil, responsive: 10000, search: {}, sort: true, sql_column: nil, th: nil, th_append: nil, visible: true, &format)
+          raise 'You cannot use partial: ... with the block syntax' if partial && block_given?
+
+          name = name.to_sym unless name.to_s.include?('.')
+
+          datatable._columns[name] = Effective::DatatableColumn.new(
+            action: action,  # resource columns only
+            as: as,
+            compute: nil,
+            col_class: col_class,
+            format: (format if block_given?),
+            index: nil,
+            label: (label.nil? ? name.to_s.split('.').last.titleize : label),
+            name: name,
+            partial: partial,
+            partial_as: partial_as,
+            responsive: responsive,
+            search: search,
+            sort: sort,
+            sql_column: sql_column,
+            th: th,
+            th_append: th_append,
+            visible: visible,
+          )
         end
 
-        def actions_column(options = {}, proc = nil, &block)
-          show = options.fetch(:show, (EffectiveDatatables.actions_column[:show] rescue false))
-          edit = options.fetch(:edit, (EffectiveDatatables.actions_column[:edit] rescue false))
-          destroy = options.fetch(:destroy, (EffectiveDatatables.actions_column[:destroy] rescue false))
-          unarchive = options.fetch(:unarchive, (EffectiveDatatables.actions_column[:unarchive] rescue false))
-          name = options.fetch(:name, 'actions')
+        # A val is a computed value that is then sorted/searched after the block is run
+        # You can have another block by calling .format afterwards to work on the computed value itself
+        def val(name, action: nil, as: nil, col_class: nil, label: nil, partial: nil, partial_as: nil, responsive: 10000, search: {}, sort: true, sql_column: false, th: nil, th_append: nil, visible: true, &compute)
+          raise 'You cannot use partial: ... with the block syntax' if partial && block_given?
 
-          opts = {
-            sortable: false,
-            filter: false,
-            responsivePriority: 0,
-            partial_locals: { show_action: show, edit_action: edit, destroy_action: destroy, unarchive_action: unarchive }
-          }.merge(options)
+          name = name.to_sym unless name.to_s.include?('.')
 
-          opts[:partial_local] ||= :resource unless opts[:partial].present?
-          opts[:partial] ||= '/effective/datatables/actions_column' unless (block_given? || proc.present?)
-
-          table_column(name, opts, proc, &block)
+          datatable._columns[name] = Effective::DatatableColumn.new(
+            action: action, # Resource columns only
+            as: as,
+            compute: (compute if block_given?),
+            col_class: col_class,
+            format: nil,
+            index: nil,
+            label: (label.nil? ? name.to_s.split('.').last.titleize : label),
+            name: name,
+            partial: partial,
+            partial_as: partial_as,
+            responsive: responsive,
+            search: search,
+            sort: sort,
+            sql_column: (block_given? ? false : sql_column),
+            th: th,
+            th_append: th_append,
+            visible: visible,
+          )
         end
 
-        def bulk_actions_column(options = {}, proc = nil, &block)
-          name = options.fetch(:name, 'bulk_actions')
-          resource_method = options.fetch(:resource_method, :to_param)
+        def actions_col(btn_class: nil, col_class: nil, inline: nil, partial: nil, partial_as: nil, actions_partial: nil, responsive: 5000, visible: true, **actions, &format)
+          raise 'You can only have one actions column' if datatable.columns[:_actions].present?
 
-          opts = {
-            bulk_actions_column: true,
-            label: '',
-            partial_local: :resource,
-            partial: '/effective/datatables/bulk_actions_column',
-            partial_locals: { resource_method: resource_method },
-            sortable: false,
-            dropdown_partial: '/effective/datatables/bulk_actions_dropdown',
-            dropdown_block: block
-          }.merge(options)
+          datatable._columns[:_actions] = Effective::DatatableColumn.new(
+            action: false,
+            as: :actions,
+            compute: nil,
+            btn_class: (btn_class || 'btn-sm btn-outline-primary'),
+            col_class: col_class,
+            format: (format if block_given?),
+            index: nil,
+            inline: (inline.nil? ? datatable.inline? : inline),
+            label: false,
+            name: :actions,
+            partial: partial,
+            partial_as: partial_as,
+            actions_partial: (actions_partial || :dropleft),
+            responsive: responsive,
+            search: false,
+            sort: false,
+            sql_column: nil,
+            th: nil,
+            th_append: nil,
+            visible: visible,
 
-          table_column(name, opts, proc)
+            # { approve: false }. These args are passed to effective_resources render_resource_actions
+            actions: actions
+          )
         end
 
-        def aggregate(name, options = {}, &block)
-          if block_given?
-            raise "You cannot use proc: ... with the block syntax" if options[:proc]
-            options[:block] = block
-          end
-
-          (@aggregates ||= HashWithIndifferentAccess.new)[name] = options
+        def aggregate(name, label: nil, &compute)
+          datatable._aggregates[name.to_sym] = {
+            compute: (compute if block_given?),
+            label: label || name.to_s.titleize,
+            name: name.to_sym,
+          }
         end
+
+        # Called automatically after bulk_actions do ... end
+        # Call again if you want to change the position of the bulk_actions_col
+        def bulk_actions_col(col_class: nil, input_name: nil, partial: nil, partial_as: nil, responsive: 5000)
+          datatable._columns.delete(:_bulk_actions) if datatable.columns[:_bulk_actions]
+
+          datatable._columns[:_bulk_actions] = Effective::DatatableColumn.new(
+            action: false,
+            as: :bulk_actions,
+            compute: nil,
+            col_class: col_class,
+            format: nil,
+            index: nil,
+            input_name: (input_name || 'bulk_actions_resources'),
+            label: false,
+            name: :bulk_actions,
+            partial: partial || '/effective/datatables/bulk_actions_column',
+            partial_as: partial_as,
+            responsive: responsive,
+            search: { as: :bulk_actions },
+            sort: false,
+            sql_column: nil,
+            th: nil,
+            th_append: nil,
+            visible: true,
+          )
+        end
+
+        # Called automatically after reorder
+        # Call again if you want to change the position of the reorder_col
+        def reorder_col(name, col_class: nil, partial: nil, partial_as: nil, sql_column: nil, responsive: 5000)
+          datatable._columns.delete(:_reorder) if datatable.columns[:_reorder]
+
+          datatable._columns[:_reorder] = Effective::DatatableColumn.new(
+            action: false,
+            as: :reorder,
+            compute: nil,
+            col_class: col_class,
+            format: nil,
+            index: nil,
+            label: false,
+            name: :reorder,
+            partial: partial || '/effective/datatables/reorder_column',
+            partial_as: partial_as,
+            reorder: name,
+            responsive: responsive,
+            search: false,
+            sort: true,
+            sql_column: (sql_column || name),
+            th: nil,
+            th_append: nil,
+            visible: false
+          )
+        end
+
       end
     end
   end
