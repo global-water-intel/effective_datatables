@@ -1,6 +1,7 @@
 <%
+  html_id = "#{datatable.to_param}-table-#{Time.zone.now.nsec}"
   effective_datatable_params = {
-    id: "#{datatable.to_param}-table-#{Time.zone.now.nsec}",
+    id: html_id,
     class: "effective-datatable #{datatable.table_html_class}",
     data: {
       'effective-form-inputs' => defined?(EffectiveFormInputs),
@@ -23,7 +24,9 @@
 <%= render_datatable_scopes(datatable) %>
 
 <% if datatable.charts? %>
-  <%= render partial: datatable.charts_partial, locals: { datatable: datatable } %>
+  <div class="<%= html_id %> charts-container">
+    <%= render partial: datatable.charts_partial, locals: { datatable: datatable } %>
+  </div>
 <% end %>
 
 <%= content_tag 'table', effective_datatable_params do %>

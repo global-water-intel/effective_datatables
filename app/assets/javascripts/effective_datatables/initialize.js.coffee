@@ -1,3 +1,9 @@
+window.datatableAjaxDone = (id) ->
+  return (json) ->
+    if window.datatableAjaxHook
+      window.datatableAjaxHook(id, json)
+    return json.data
+
 resetFilters = ->
   window.location.pathname = window.location.pathname + '/reset_filters'
 resetAll = ->
@@ -71,7 +77,7 @@ initializeDataTables = ->
       dom: "<'row'<'col-sm-4'l><'col-sm-8'B>><'row'<'col-sm-12'tr>><'row'<'col-sm-6'i><'col-sm-6'p>>"
       displayStart: datatable.data('display-start')
       pageLength: datatable.data('page-length')
-      ajax: { url: datatable.data('source'), type: 'POST' }
+      ajax: { url: datatable.data('source'), type: 'POST', dataSrc: window.datatableAjaxDone(datatable.attr('id')) }
       autoWidth: false
       buttons: extraButtons.concat(baseButtons)
       colReorder: false
