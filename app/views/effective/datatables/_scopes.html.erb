@@ -3,13 +3,14 @@
     <%= simple_form_for :scopes, url: request.path, method: :get, html: { class: 'datatable-scopes' } do |form| %>
       <div class="row" style="margin-bottom: 1rem;">
         <% datatable.scopes.each do |name, options| %>
+          <% label = options[:label].presence || name %>
           <div class="col-md-3">
             <% if options[:block].present? %>
               <%= form.instance_exec(form, &options[:block]) %>
             <% elsif options[:partial].present? %>
               <%= render partial: options[:partial], locals: { form: form, f: form, datatable: datatable } %>
             <% else %>
-              <%= form.input name, options[:filter].merge(required: false) %>
+              <%= form.input label, options[:filter].merge(required: false) %>
             <% end %>
           </div>
         <% end %>
