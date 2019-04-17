@@ -58,7 +58,7 @@ module Effective
       when :exists
         query exists: { field: name }
       when :string, :text, :enumeration
-        query wildcard: { name => "*#{search_term.downcase}*" }
+        query wildcard: { name => "*#{ActiveSupport::Inflector.transliterate(search_term).downcase}*" }
         # query match: { name => term }
       when :foreign_key, :exact_string, :boolean
         filter term: { name => search_term }
