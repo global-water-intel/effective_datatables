@@ -8,6 +8,10 @@ module Effective
     end
 
     module ClassMethods
+      def iterate_results_instead_of_records
+        false
+      end
+
       def make_index_name(klass, main_name = nil)
         main_name ||= klass.table_name
         [
@@ -193,7 +197,9 @@ module Effective
       end
 
       def es_query
-        ElasticsearchQueryBuilder.new(self)
+        ElasticsearchQueryBuilder
+          .new(self)
+          .tap { |e| e.iterate_results_instead_of_records = iterate_results_instead_of_records }
       end
 
       def belongs_to_column?(column)

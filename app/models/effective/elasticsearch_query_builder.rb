@@ -2,7 +2,8 @@ module Effective
   class ElasticsearchQueryBuilder
     include Enumerable
 
-    attr_accessor :active_record_klass, :search_options, :page_number, :page_size, :nested_filter_map, :tiebreaker_sort
+    attr_accessor :active_record_klass, :search_options, :page_number, :page_size, :nested_filter_map, :tiebreaker_sort,
+                  :iterate_results_instead_of_records
 
     def self.select_size_limit
       50
@@ -29,11 +30,15 @@ module Effective
     end
 
     def to_a
-      records.to_a
+      collection_to_use = iterate_results_instead_of_records ? es_results : records
+
+      collection_to_use.to_a
     end
 
     def each(&block)
-      records.each(&block)
+      collection_to_use = iterate_results_instead_of_records ? es_results : records
+
+      collection_to_use.each(&block)
     end
 
     def es_results
