@@ -127,6 +127,8 @@ module Effective
     def aggregate_for(aggregate_name)
       field, type, options = aggregate_definitions[aggregate_name]
 
+      raise ArgumentError, "Aggregate not registered for '#{aggregate_name}'! Modify #{self.class.name}#aggregate_definitions." if type.blank?
+
       searched_collection.aggregate_for(field, type, options)
     end
 
