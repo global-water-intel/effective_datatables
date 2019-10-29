@@ -219,6 +219,10 @@ module Effective
       def es_import
         __elasticsearch__.import force: true, scope: :for_elasticsearch
       end
+
+      def update_mapping
+        Elasticsearch::Model.client.indices.put_mapping index: index_name, type: base_class.name.underscore, body: mapping.to_hash
+      end
     end
 
     def as_indexed_json_hook(default_json)
