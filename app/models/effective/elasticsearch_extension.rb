@@ -220,7 +220,7 @@ module Effective
         __elasticsearch__.import force: true, scope: :for_elasticsearch
       end
 
-      def update_mapping
+      def es_update
         Elasticsearch::Model.client.indices.put_mapping index: index_name, type: base_class.name.underscore, body: mapping.to_hash
 
         __elasticsearch__.import scope: :for_elasticsearch
