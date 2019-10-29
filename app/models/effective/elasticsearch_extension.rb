@@ -222,6 +222,8 @@ module Effective
 
       def update_mapping
         Elasticsearch::Model.client.indices.put_mapping index: index_name, type: base_class.name.underscore, body: mapping.to_hash
+
+        __elasticsearch__.import scope: :for_elasticsearch
       end
     end
 
