@@ -98,20 +98,20 @@ module EffectiveDatatablesHelper
       form.input name, label: false, required: false, value: value,
         as: :string,
         placeholder: placeholder,
-        input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} }
+        input_html: { id: '', name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} }
     when :date
       form.input name, label: false, required: false, value: value,
         as: (ActionView::Helpers::FormBuilder.instance_methods.include?(:effective_date_picker) ? :effective_date_picker : :string),
         placeholder: placeholder,
         input_group: false,
-        input_html: { name: nil, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
+        input_html: { id: '', name: nil, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
         input_js: { useStrict: true, keepInvalid: true }
     when :datetime
       form.input name, label: false, required: false, value: value,
         as: (ActionView::Helpers::FormBuilder.instance_methods.include?(:effective_date_time_picker) ? :effective_date_time_picker : :string),
         placeholder: placeholder,
         input_group: false,
-        input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
+        input_html: { id: '', name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
         input_js: { useStrict: true, keepInvalid: true } # Keep invalid format like "2015-11" so we can still filter by year, month or day
     when :select, :boolean
       form.input name, label: false, required: false, value: value,
@@ -120,7 +120,7 @@ module EffectiveDatatablesHelper
         selected: value, # TODO: replacing opts[:filter][:selected] this is naughty but I'm not sure how to getthe select filter preloaded when using save_state
         multiple: opts[:filter][:multiple] == true,
         include_blank: include_blank,
-        input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
+        input_html: { id: '', name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
         input_js: { placeholder: placeholder }
     when :grouped_select
       form.input name, label: false, required: false, value: value,
@@ -133,12 +133,12 @@ module EffectiveDatatablesHelper
         polymorphic: opts[:filter][:polymorphic] == true,
         group_label_method: opts[:filter][:group_label_method] || :first,
         group_method: opts[:filter][:group_method] || :last,
-        input_html: { name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
+        input_html: { id: '', name: nil, value: value, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index]} },
         input_js: { placeholder: placeholder }
     when :bulk_actions_column
       form.input name, label: false, required: false, value: nil,
         as: :boolean,
-        input_html: { name: nil, value: nil, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index], 'role' => 'bulk-actions-all'} }
+        input_html: { id: '', name: nil, value: nil, autocomplete: 'off', data: {'column-name' => opts[:name], 'column-index' => opts[:index], 'role' => 'bulk-actions-all'} }
     end
   end
 
