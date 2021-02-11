@@ -6,8 +6,10 @@ module EffectiveDatatables
 
     # Include Helpers to base application
     initializer 'effective_datatables.action_controller' do |app|
-      ActiveSupport.on_load :action_controller do
-        helper EffectiveDatatablesHelper
+      ActiveSupport.on_load :action_controller_base do
+        # require_dependency "#{config.root}/app/helpers/effective_datatables_helper.rb"
+
+        # helper EffectiveDatatablesHelper
       end
     end
 

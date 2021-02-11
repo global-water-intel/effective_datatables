@@ -15,7 +15,7 @@ module Effective
       def make_index_name(klass, main_name = nil)
         main_name ||= klass.table_name
         [
-          Rails.application.class.parent.to_s.underscore,
+          Rails.application.class.module_parent.to_s.underscore,
           '_',
           main_name.underscore.pluralize,
           '_',
@@ -141,7 +141,7 @@ module Effective
                 # TODO: figure out what we do with spatial columns. Ignoring at the moment.
               when :uuid
                 indexes name, index: :not_analyzed, type: :string
-              when nil
+              when nil, :geometry
                 # TODO: hack to deal with spatial columns being borked in Rails 5
               else
                 raise NotImplementedError, "Don't know how to handle ActiveRecord column type: `#{type}`."
