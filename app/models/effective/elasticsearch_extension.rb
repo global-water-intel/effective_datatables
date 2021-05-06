@@ -119,28 +119,28 @@ module Effective
                 indexes name, analyzer: :keyword_case_insensitive
               when :integer
                 if klass.defined_enums.keys.include?(name)
-                  indexes name, index: :not_analyzed, type: :string
+                  indexes name, type: :keyword
                 else
-                  indexes name, index: :not_analyzed, type: :integer
-                  indexes name_for_searching, index: :not_analyzed, type: :string
+                  indexes name, type: :integer
+                  indexes name_for_searching, type: :keyword
 
                   if klass.belongs_to_column?(column.name)
                     indexes name.gsub('_id', ''), analyzer: :keyword_case_insensitive
-                    indexes "#{name.to_s.gsub('_id', '')}_raw", index: :not_analyzed
+                    indexes "#{name.to_s.gsub('_id', '')}_raw", type: :keyword
                   end
                 end
               when :datetime, :date
-                indexes name, index: :not_analyzed, type: :date, format: :date
-                indexes name_for_searching, index: :not_analyzed, type: :string
+                indexes name, type: :date, format: :date
+                indexes name_for_searching, type: :keyword
               when :decimal, :float
-                indexes name, index: :not_analyzed, type: :float
-                indexes name_for_searching, index: :not_analyzed, type: :string
+                indexes name, type: :float
+                indexes name_for_searching, type: :keyword
               when :boolean
-                indexes name, index: :not_analyzed, type: :boolean
+                indexes name, type: :boolean
               when :spatial
                 # TODO: figure out what we do with spatial columns. Ignoring at the moment.
               when :uuid
-                indexes name, index: :not_analyzed, type: :string
+                indexes name, type: :keyword
               when nil
                 # TODO: hack to deal with spatial columns being borked in Rails 5
               else
@@ -154,8 +154,8 @@ module Effective
                 name = reflection.name
 
                 indexes name, analyzer: :keyword_case_insensitive
-                indexes "#{name}_id", index: :not_analyzed, type: :integer
-                indexes "#{name.to_s.gsub('_id', '')}_raw", index: :not_analyzed
+                indexes "#{name}_id", type: :integer
+                indexes "#{name.to_s.gsub('_id', '')}_raw", type: :keyword
               end
             end
 

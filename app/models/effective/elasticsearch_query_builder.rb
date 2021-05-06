@@ -199,7 +199,7 @@ module Effective
 
       search_options.freeze
 
-      ex = active_record_klass.__elasticsearch__.search(search_options).page(page_number).per(page_size)
+      ex = active_record_klass.__elasticsearch__.search(search_options, request_cache: true).page(page_number).per(page_size)
 
       return @execute_result = ex if @cache_execute
       ex
