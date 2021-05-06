@@ -30,12 +30,12 @@ module Effective
         settings_options = {
           index: {
             number_of_shards: 1,
-            max_result_window: 9_999_999
-            # cache: {
-            #   query: {
-            #     enable: false
-            #   }
-            # }
+            max_result_window: 9_999_999,
+            requests: {
+              cache: {
+                enable: true
+              }
+            }
           },
           analysis: {
             tokenizer: {
