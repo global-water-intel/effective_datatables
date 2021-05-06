@@ -114,9 +114,9 @@ module Effective
 
               case column.type
               when :string
-                indexes name, analyzer: :keyword_case_insensitive
+                indexes name, analyzer: :keyword_case_insensitive, fielddata: true
               when :text
-                indexes name, analyzer: :keyword_case_insensitive
+                indexes name, analyzer: :keyword_case_insensitive, fielddata: true
               when :integer
                 if klass.defined_enums.keys.include?(name)
                   indexes name, type: :keyword
@@ -125,7 +125,7 @@ module Effective
                   indexes name_for_searching, type: :keyword
 
                   if klass.belongs_to_column?(column.name)
-                    indexes name.gsub('_id', ''), analyzer: :keyword_case_insensitive
+                    indexes name.gsub('_id', ''), analyzer: :keyword_case_insensitive, fielddata: true
                     indexes "#{name.to_s.gsub('_id', '')}_raw", type: :keyword
                   end
                 end
@@ -153,7 +153,7 @@ module Effective
               if reflection.has_one?
                 name = reflection.name
 
-                indexes name, analyzer: :keyword_case_insensitive
+                indexes name, analyzer: :keyword_case_insensitive, fielddata: true
                 indexes "#{name}_id", type: :integer
                 indexes "#{name.to_s.gsub('_id', '')}_raw", type: :keyword
               end
