@@ -52,7 +52,7 @@ module Effective
         @body[key] = {
           terms: {
             field: field,
-            size: 0
+            size: 999_999
           }
         }
       when :filtered_terms_sum
@@ -69,7 +69,7 @@ module Effective
           filter: filter_with_default,
           aggs: {
             key_3 => {
-              terms: { field: field, size: 0 },
+              terms: { field: field, size: 999_999 },
               aggs: {
                 key_2 => {
                   stats: { field: options[:sum_over] }
@@ -98,7 +98,7 @@ module Effective
           filter: filter_with_default,
           aggs: {
             key_3 => {
-              terms: { field: field, size: 0 },
+              terms: { field: field, size: 999_999 },
               aggs: sum_over_aggs
             }
           }
