@@ -206,7 +206,7 @@ module Effective
     end
 
     def execute_unfiltered_count!
-      opts = { size: 999_999 }
+      opts = { size: 1 }
 
       active_record_klass.__elasticsearch__.search(opts).total_count
     end
