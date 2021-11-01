@@ -44,6 +44,11 @@ module Effective
           table_column col, visible: visibility, type: type_for_attribute(col) do |record|
             record.send(col).map(&:to_s).join('<br><hr>')
           end
+        elsif type_for_attribute(col) == :string
+          table_column "#{col}.raw", label: col.to_s.humanize, visible: visibility, type: type_for_attribute(col) do |record|
+            record.send col
+          end
+
         else
           table_column col, visible: visibility, type: type_for_attribute(col)
         end
