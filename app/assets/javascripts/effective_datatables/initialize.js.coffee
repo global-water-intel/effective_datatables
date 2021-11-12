@@ -8,6 +8,8 @@ resetFilters = ->
   window.location.pathname = window.location.pathname + '/reset_filters'
 resetAll = ->
   window.location.pathname = window.location.pathname + '/reset_all'
+downloadAll = ->
+  window.location.pathname = window.location.pathname + '/download_all'
 
 initializeDataTables = ->
   $('table.effective-datatable').each ->
@@ -65,6 +67,10 @@ initializeDataTables = ->
           text: 'Reset Everything',
           action: resetAll
         },
+        {
+          text: 'Download ALL',
+          action: downloadAll
+        }
       ]
     else
       extraButtons = []
