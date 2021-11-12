@@ -50,7 +50,7 @@ module Effective
           end
 
         else
-          table_column col, visible: visibility, type: type_for_attribute(col)
+          table_column col, visible: visibility, type: type_for_attribute(col), sortable: type_for_attribute(col).to_sym != :text
         end
       end
 

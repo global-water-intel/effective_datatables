@@ -19,6 +19,7 @@ module Effective
 
     def order(collection)
       return collection unless order_by_column.present?
+      return collection unless order_by_column[:sortable]
 
       column_order = order_column(collection, order_by_column, @datatable.order_direction, order_by_column[:column])
       raise 'order_column must truthy to .es_query_builder? method' unless column_order.try(:es_query_builder?)
