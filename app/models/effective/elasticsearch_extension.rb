@@ -142,6 +142,8 @@ module Effective
                 indexes name, type: :boolean
               when :spatial
                 # TODO: figure out what we do with spatial columns. Ignoring at the moment.
+              when :geometry
+                # TODO: figure out what we do with spatial columns. Ignoring at the moment.
               when :uuid
                 indexes name, type: :keyword
               when nil
@@ -269,6 +271,8 @@ module Effective
         when :boolean
           h[name] = send(name)
         when :spatial
+          # TODO: figure out what we do with spatial columns. Ignoring at the moment.
+        when :geometry
           # TODO: figure out what we do with spatial columns. Ignoring at the moment.
         when :uuid
           h[name] = send(name).to_s
