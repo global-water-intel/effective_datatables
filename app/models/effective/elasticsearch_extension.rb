@@ -15,7 +15,7 @@ module Effective
       def make_index_name(klass, main_name = nil)
         main_name ||= klass.table_name
         [
-          Rails.application.class.parent.to_s.underscore,
+          Rails.application.class.module_parent.to_s.underscore,
           '_',
           main_name.underscore.pluralize,
           '_',
