@@ -1,0 +1,14 @@
+---
+nl:
+  effective_datatables:
+    apply: Toepassen
+    reset: Reset
+    reorder: Opnieuw ordenen
+    new: Nieuwe
+    actions: Acties
+    bulk_actions: Bulkacties
+    no_bulk_actions: Geen bulkacties
+    applying: Toepassen...
+    boolean_true: 'Ja'
+    boolean_false: 'Nee'
+    all: Te doen
