@@ -24,10 +24,11 @@ module Effective
         ].join.downcase
       end
 
-      def elasticsearch_initialize(index_name_override = nil)
+      def elasticsearch_initialize(index_name_override = nil, type: nil)
         index_name make_index_name(self, index_name_override)
-        document_type base_class.name.underscore
+        type = base_class.name.underscore
         settings_options = {
+          max_ngram_diff: 20,
           index: {
             number_of_shards: 1,
             max_result_window: 9_999_999,
@@ -40,7 +41,7 @@ module Effective
           analysis: {
             tokenizer: {
               ngram_tokenizer: {
-                type: :nGram,
+                type: :ngram,
                 min_gram: 1,
                 max_gram: 20,
                 token_chars: %w(letter digit punctuation symbol)
@@ -48,7 +49,7 @@ module Effective
             },
             filter: {
               nGram_filter: {
-                type: :nGram,
+                type: :ngram,
                 min_gram: 1,
                 max_gram: 20,
                 token_chars: %w(letter digit punctuation symbol)
@@ -68,7 +69,7 @@ module Effective
               nGram_analyzer: {
                 type: :custom,
                 tokenizer: :whitespace,
-                filter: %w(lowercase asciifolding nGram_filter our_synonyms),
+                filter: %w(lowercase asciifolding our_synonyms nGram_filter),
                 char_filter: %w(html_strip)
               },
               nGram_token_analyzer: {
@@ -123,6 +124,8 @@ module Effective
               when :integer
                 if klass.defined_enums.keys.include?(name)
                   indexes name, type: :keyword
+                elsif column.limit == 8
+                  indexes name, type: :long
                 else
                   indexes name, type: :integer
                   indexes name_for_searching, type: :keyword
