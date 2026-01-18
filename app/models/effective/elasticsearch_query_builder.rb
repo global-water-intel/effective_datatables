@@ -194,7 +194,7 @@ module Effective
       # Any modifications would just have no effect.
       # Not sure if there's a point to juggling @cache_execute if we're just gonna freeze always.
       if tiebreaker_sort.present?
-        order(tiebreaker_sort)
+        order(tiebreaker_sort) unless search_options[:sort]&.map(&:keys)&.flatten&.include?(tiebreaker_sort.keys.first.to_s)
       end
 
       search_options.freeze
